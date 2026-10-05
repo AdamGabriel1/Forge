@@ -64,5 +64,6 @@ pub fn default_registry() -> RuleRegistry {
     registry.register(Box::new(UnreachableCode));
     registry.register(Box::new(UsedBeforeAssignment));
     registry.register(Box::new(PossibleNoneDereference));
+    registry.register(Box::new(ExpensiveOperationInsideLoop));
     registry
 }

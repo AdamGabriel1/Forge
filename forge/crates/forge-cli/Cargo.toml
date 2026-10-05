@@ -1,0 +1,17 @@
+[package]
+name = "forge-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "forge"
+path = "src/main.rs"
+
+[dependencies]
+forge-core = { path = "../forge-core" }
+forge-parser = { path = "../forge-parser" }
+forge-lint = { path = "../forge-lint" }
+clap = { workspace = true }
+walkdir = "2.5"
+serde = { workspace = true }
+serde_json = { workspace = true }

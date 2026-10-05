@@ -1,0 +1,14 @@
+[package]
+name = "forge-lint"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+forge-core = { path = "../forge-core" }
+forge-semantic = { path = "../forge-semantic" }
+forge-cfg = { path = "../forge-cfg" }
+tree-sitter = { workspace = true }
+
+[dev-dependencies]
+forge-parser = { path = "../forge-parser" }
+toml = { workspace = true }

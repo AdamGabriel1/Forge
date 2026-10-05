@@ -1,0 +1,8 @@
+[package]
+name = "forge-cfg"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+forge-core = { path = "../forge-core" }
+tree-sitter = { workspace = true }

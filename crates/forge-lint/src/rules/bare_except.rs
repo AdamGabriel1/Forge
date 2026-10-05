@@ -1,6 +1,6 @@
 use crate::util::{range_of, walk};
 use crate::Rule;
-use forge_core::{Context, Diagnostic, Severity};
+use forge_core::{Context, Diagnostic, Edit, Severity};
 use tree_sitter::Node;
 
 pub struct BareExcept;
@@ -33,6 +33,26 @@ impl Rule for BareExcept {
         });
         diagnostics
     }
+
+    /// Substitui `except:` por `except Exception:` inserindo ` Exception`
+    /// imediatamente antes do token `:`.
+    fn fix(&self, node: Node, _ctx: &Context, _diagnostics: &[Diagnostic]) -> Vec<Edit> {
+        let mut edits = Vec::new();
+        walk(node, &mut |n| {
+            if n.kind() != "except_clause" || !is_bare_except(n) {
+                return;
+            }
+            let mut cursor = n.walk();
+            for child in n.children(&mut cursor) {
+                if child.kind() == ":" {
+                    let offset = child.start_byte();
+                    edits.push(Edit::replace(offset, offset, " Exception"));
+                    break;
+                }
+            }
+        });
+        edits
+    }
 }
 
 fn is_bare_except(node: Node) -> bool {
@@ -52,6 +72,7 @@ fn is_bare_except(node: Node) -> bool {
 mod tests {
     use super::*;
     use crate::util::test_util::lint;
+    use forge_core::Config;
 
     #[test]
     fn detecta_bare_except() {
@@ -103,5 +124,65 @@ finally:
     pass
 ";
         assert_eq!(lint(&BareExcept, src).len(), 1);
+    }
+
+    // ---- fix ----
+
+    fn run_fix(source: &str) -> Vec<Edit> {
+        let mut parser = forge_parser::get_parser();
+        let tree = forge_parser::parse_python_source(&mut parser, source).unwrap();
+        let cfg = Config::default();
+        let ctx = Context {
+            source,
+            filepath: "<test>",
+            config: &cfg,
+        };
+        let diags = BareExcept.check(tree.root_node(), &ctx);
+        BareExcept.fix(tree.root_node(), &ctx, &diags)
+    }
+
+    #[test]
+    fn fix_troca_except_nu_por_exception() {
+        let src = "try:\n    pass\nexcept:\n    pass\n";
+        let edits = run_fix(src);
+        assert_eq!(edits.len(), 1);
+        let novo = forge_core::apply_edits(src, edits);
+        assert_eq!(novo, "try:\n    pass\nexcept Exception:\n    pass\n");
+    }
+
+    #[test]
+    fn fix_troca_multiplos() {
+        let src = "\
+try:
+    pass
+except:
+    pass
+try:
+    pass
+except:
+    pass
+";
+        let edits = run_fix(src);
+        assert_eq!(edits.len(), 2);
+        let novo = forge_core::apply_edits(src, edits);
+        assert_eq!(
+            novo,
+            "\
+try:
+    pass
+except Exception:
+    pass
+try:
+    pass
+except Exception:
+    pass
+"
+        );
+    }
+
+    #[test]
+    fn fix_nao_toca_except_ja_especificado() {
+        let src = "try:\n    pass\nexcept Exception:\n    pass\n";
+        assert!(run_fix(src).is_empty());
     }
 }

@@ -1,4 +1,5 @@
 mod bare_except;
+mod expensive_operation_inside_loop;
 mod function_too_long;
 mod mutable_default_argument;
 mod possible_none_dereference;
@@ -13,6 +14,7 @@ mod unused_variable;
 mod used_before_assignment;
 
 pub use bare_except::BareExcept;
+pub use expensive_operation_inside_loop::ExpensiveOperationInsideLoop;
 pub use function_too_long::FunctionTooLong;
 pub use mutable_default_argument::MutableDefaultArgument;
 pub use possible_none_dereference::PossibleNoneDereference;

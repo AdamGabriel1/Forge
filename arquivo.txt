@@ -1,0 +1,1079 @@
+.
+├── arquivo.txt
+├── forge
+│   ├── Cargo.lock
+│   ├── Cargo.toml
+│   ├── crates
+│   │   ├── forge-cfg
+│   │   │   ├── Cargo.toml
+│   │   │   └── src
+│   │   │       └── lib.rs
+│   │   ├── forge-cli
+│   │   │   ├── Cargo.toml
+│   │   │   └── src
+│   │   │       └── main.rs
+│   │   ├── forge-core
+│   │   │   ├── Cargo.toml
+│   │   │   └── src
+│   │   │       ├── lib.rs
+│   │   │       └── noqa.rs
+│   │   ├── forge-lint
+│   │   │   ├── Cargo.toml
+│   │   │   └── src
+│   │   │       ├── lib.rs
+│   │   │       ├── rules
+│   │   │       │   ├── bare_except.rs
+│   │   │       │   ├── expensive_operation_inside_loop.rs
+│   │   │       │   ├── function_too_long.rs
+│   │   │       │   ├── mod.rs
+│   │   │       │   ├── mutable_default_argument.rs
+│   │   │       │   ├── possible_none_dereference.rs
+│   │   │       │   ├── redefined_function.rs
+│   │   │       │   ├── shadowed_builtin.rs
+│   │   │       │   ├── shadowed_variable.rs
+│   │   │       │   ├── too_many_arguments.rs
+│   │   │       │   ├── undefined_name.rs
+│   │   │       │   ├── unreachable_code.rs
+│   │   │       │   ├── unused_import.rs
+│   │   │       │   ├── unused_variable.rs
+│   │   │       │   └── used_before_assignment.rs
+│   │   │       └── util.rs
+│   │   ├── forge-parser
+│   │   │   ├── Cargo.toml
+│   │   │   └── src
+│   │   │       └── lib.rs
+│   │   └── forge-semantic
+│   │       ├── Cargo.toml
+│   │       └── src
+│   │           └── lib.rs
+│   ├── loops.py
+│   └── target
+│       ├── CACHEDIR.TAG
+│       └── debug
+│           ├── build
+│           │   ├── proc-macro2-43d6a45c41cd7ac9
+│           │   │   ├── invoked.timestamp
+│           │   │   ├── out
+│           │   │   ├── output
+│           │   │   ├── root-output
+│           │   │   └── stderr
+│           │   ├── proc-macro2-8c620669baf7394b
+│           │   │   ├── build-script-build
+│           │   │   ├── build_script_build-8c620669baf7394b
+│           │   │   └── build_script_build-8c620669baf7394b.d
+│           │   ├── proc-macro2-a8d356aba312f19c
+│           │   │   ├── build-script-build
+│           │   │   ├── build_script_build-a8d356aba312f19c
+│           │   │   └── build_script_build-a8d356aba312f19c.d
+│           │   ├── proc-macro2-da7498f983f2967d
+│           │   │   ├── invoked.timestamp
+│           │   │   ├── out
+│           │   │   ├── output
+│           │   │   ├── root-output
+│           │   │   └── stderr
+│           │   ├── quote-00dde65f026b170f
+│           │   │   ├── build-script-build
+│           │   │   ├── build_script_build-00dde65f026b170f
+│           │   │   └── build_script_build-00dde65f026b170f.d
+│           │   ├── quote-459202a1c32f6e19
+│           │   │   ├── invoked.timestamp
+│           │   │   ├── out
+│           │   │   ├── output
+│           │   │   ├── root-output
+│           │   │   └── stderr
+│           │   ├── quote-a643a56eb2069f55
+│           │   │   ├── build-script-build
+│           │   │   ├── build_script_build-a643a56eb2069f55
+│           │   │   └── build_script_build-a643a56eb2069f55.d
+│           │   ├── quote-e080c4aaca1850d2
+│           │   │   ├── invoked.timestamp
+│           │   │   ├── out
+│           │   │   ├── output
+│           │   │   ├── root-output
+│           │   │   └── stderr
+│           │   ├── serde-045d6d86c89f5c13
+│           │   │   ├── invoked.timestamp
+│           │   │   ├── out
+│           │   │   │   └── private.rs
+│           │   │   ├── output
+│           │   │   ├── root-output
+│           │   │   └── stderr
+│           │   ├── serde-07f1456055ac8152
+│           │   │   ├── build-script-build
+│           │   │   ├── build_script_build-07f1456055ac8152
+│           │   │   └── build_script_build-07f1456055ac8152.d
+│           │   ├── serde_core-4954989e5d8a5802
+│           │   │   ├── invoked.timestamp
+│           │   │   ├── out
+│           │   │   │   └── private.rs
+│           │   │   ├── output
+│           │   │   ├── root-output
+│           │   │   └── stderr
+│           │   ├── serde_core-e69dab21d2fc06b6
+│           │   │   ├── build-script-build
+│           │   │   ├── build_script_build-e69dab21d2fc06b6
+│           │   │   └── build_script_build-e69dab21d2fc06b6.d
+│           │   ├── serde_json-b4d1b8e2b93b1ef9
+│           │   │   ├── build-script-build
+│           │   │   ├── build_script_build-b4d1b8e2b93b1ef9
+│           │   │   └── build_script_build-b4d1b8e2b93b1ef9.d
+│           │   ├── serde_json-d1568ecbc75544c3
+│           │   │   ├── invoked.timestamp
+│           │   │   ├── out
+│           │   │   ├── output
+│           │   │   ├── root-output
+│           │   │   └── stderr
+│           │   ├── tree-sitter-6710e0da8e72acf7
+│           │   │   ├── build-script-build
+│           │   │   ├── build_script_build-6710e0da8e72acf7
+│           │   │   └── build_script_build-6710e0da8e72acf7.d
+│           │   ├── tree-sitter-75caa5c16ad4be73
+│           │   │   ├── invoked.timestamp
+│           │   │   ├── out
+│           │   │   │   ├── 98490c8781b409d2-lib.o
+│           │   │   │   ├── flag_check
+│           │   │   │   ├── flag_check.c
+│           │   │   │   ├── libtree-sitter.a
+│           │   │   │   └── stdlib-symbols.txt
+│           │   │   ├── output
+│           │   │   ├── root-output
+│           │   │   └── stderr
+│           │   ├── tree-sitter-python-2139e79a9a260053
+│           │   │   ├── invoked.timestamp
+│           │   │   ├── out
+│           │   │   │   ├── ea708c7824d36062-parser.o
+│           │   │   │   ├── ea708c7824d36062-scanner.o
+│           │   │   │   ├── flag_check
+│           │   │   │   ├── flag_check.c
+│           │   │   │   └── libtree-sitter-python.a
+│           │   │   ├── output
+│           │   │   ├── root-output
+│           │   │   └── stderr
+│           │   ├── tree-sitter-python-ffc8c80edb455b64
+│           │   │   ├── build-script-build
+│           │   │   ├── build_script_build-ffc8c80edb455b64
+│           │   │   └── build_script_build-ffc8c80edb455b64.d
+│           │   ├── zmij-5f689cf4f6eec93e
+│           │   │   ├── invoked.timestamp
+│           │   │   ├── out
+│           │   │   ├── output
+│           │   │   ├── root-output
+│           │   │   └── stderr
+│           │   └── zmij-d4660f97c989b8f4
+│           │       ├── build-script-build
+│           │       ├── build_script_build-d4660f97c989b8f4
+│           │       └── build_script_build-d4660f97c989b8f4.d
+│           ├── deps
+│           │   ├── aho_corasick-84481b7457a84fc2.d
+│           │   ├── anstream-353fb9cff00379ad.d
+│           │   ├── anstyle-32a918a3829821ca.d
+│           │   ├── anstyle_parse-d9f4241b4eb4096b.d
+│           │   ├── anstyle_query-b4f4ab895cb26316.d
+│           │   ├── cc-f9cf0defc85b158a.d
+│           │   ├── clap-058d550e673ed7ce.d
+│           │   ├── clap_builder-c885de4c5138b9b2.d
+│           │   ├── clap_derive-2b28c84ac22e8c10.d
+│           │   ├── clap_lex-268c2050306ad4de.d
+│           │   ├── colorchoice-7326d087f65b6fd9.d
+│           │   ├── equivalent-2688e47a62c4aee1.d
+│           │   ├── find_msvc_tools-3db4d81764298103.d
+│           │   ├── forge_cfg-64644603d8aae951.d
+│           │   ├── forge_cfg-6d2cbd5d6a4840a7.d
+│           │   ├── forge_core-5de57ed6068bef2c.d
+│           │   ├── forge_core-d95d110b623f910a.d
+│           │   ├── forge-f80e0fb5adfc45c4
+│           │   ├── forge-f80e0fb5adfc45c4.d
+│           │   ├── forge_lint-2161b8bf98984f3a.d
+│           │   ├── forge_lint-227a69856fbd45fd.d
+│           │   ├── forge_lint-b16c42c130350d61
+│           │   ├── forge_lint-b16c42c130350d61.d
+│           │   ├── forge_parser-ab0d47bfb4236bdf.d
+│           │   ├── forge_semantic-3fab9715d9c02afd.d
+│           │   ├── forge_semantic-83a1adfcb1493d0b.d
+│           │   ├── hashbrown-f537337c4ba8b1fa.d
+│           │   ├── heck-d8f5fb9d4d015e13.d
+│           │   ├── indexmap-812d11a50128bdd2.d
+│           │   ├── is_terminal_polyfill-69f66caf207ae790.d
+│           │   ├── itoa-5b56393bc94cfad5.d
+│           │   ├── libaho_corasick-84481b7457a84fc2.rlib
+│           │   ├── libaho_corasick-84481b7457a84fc2.rmeta
+│           │   ├── libanstream-353fb9cff00379ad.rlib
+│           │   ├── libanstream-353fb9cff00379ad.rmeta
+│           │   ├── libanstyle-32a918a3829821ca.rlib
+│           │   ├── libanstyle-32a918a3829821ca.rmeta
+│           │   ├── libanstyle_parse-d9f4241b4eb4096b.rlib
+│           │   ├── libanstyle_parse-d9f4241b4eb4096b.rmeta
+│           │   ├── libanstyle_query-b4f4ab895cb26316.rlib
+│           │   ├── libanstyle_query-b4f4ab895cb26316.rmeta
+│           │   ├── libcc-f9cf0defc85b158a.rlib
+│           │   ├── libcc-f9cf0defc85b158a.rmeta
+│           │   ├── libclap-058d550e673ed7ce.rlib
+│           │   ├── libclap-058d550e673ed7ce.rmeta
+│           │   ├── libclap_builder-c885de4c5138b9b2.rlib
+│           │   ├── libclap_builder-c885de4c5138b9b2.rmeta
+│           │   ├── libclap_derive-2b28c84ac22e8c10.so
+│           │   ├── libclap_lex-268c2050306ad4de.rlib
+│           │   ├── libclap_lex-268c2050306ad4de.rmeta
+│           │   ├── libcolorchoice-7326d087f65b6fd9.rlib
+│           │   ├── libcolorchoice-7326d087f65b6fd9.rmeta
+│           │   ├── libequivalent-2688e47a62c4aee1.rlib
+│           │   ├── libequivalent-2688e47a62c4aee1.rmeta
+│           │   ├── libfind_msvc_tools-3db4d81764298103.rlib
+│           │   ├── libfind_msvc_tools-3db4d81764298103.rmeta
+│           │   ├── libforge_cfg-64644603d8aae951.rlib
+│           │   ├── libforge_cfg-64644603d8aae951.rmeta
+│           │   ├── libforge_cfg-6d2cbd5d6a4840a7.rlib
+│           │   ├── libforge_cfg-6d2cbd5d6a4840a7.rmeta
+│           │   ├── libforge_core-5de57ed6068bef2c.rlib
+│           │   ├── libforge_core-5de57ed6068bef2c.rmeta
+│           │   ├── libforge_core-d95d110b623f910a.rlib
+│           │   ├── libforge_core-d95d110b623f910a.rmeta
+│           │   ├── libforge_lint-2161b8bf98984f3a.rlib
+│           │   ├── libforge_lint-2161b8bf98984f3a.rmeta
+│           │   ├── libforge_lint-227a69856fbd45fd.rlib
+│           │   ├── libforge_lint-227a69856fbd45fd.rmeta
+│           │   ├── libforge_parser-ab0d47bfb4236bdf.rlib
+│           │   ├── libforge_parser-ab0d47bfb4236bdf.rmeta
+│           │   ├── libforge_semantic-3fab9715d9c02afd.rlib
+│           │   ├── libforge_semantic-3fab9715d9c02afd.rmeta
+│           │   ├── libforge_semantic-83a1adfcb1493d0b.rlib
+│           │   ├── libforge_semantic-83a1adfcb1493d0b.rmeta
+│           │   ├── libhashbrown-f537337c4ba8b1fa.rlib
+│           │   ├── libhashbrown-f537337c4ba8b1fa.rmeta
+│           │   ├── libheck-d8f5fb9d4d015e13.rlib
+│           │   ├── libheck-d8f5fb9d4d015e13.rmeta
+│           │   ├── libindexmap-812d11a50128bdd2.rlib
+│           │   ├── libindexmap-812d11a50128bdd2.rmeta
+│           │   ├── libis_terminal_polyfill-69f66caf207ae790.rlib
+│           │   ├── libis_terminal_polyfill-69f66caf207ae790.rmeta
+│           │   ├── libitoa-5b56393bc94cfad5.rlib
+│           │   ├── libitoa-5b56393bc94cfad5.rmeta
+│           │   ├── libmemchr-e16633741164b756.rlib
+│           │   ├── libmemchr-e16633741164b756.rmeta
+│           │   ├── libowo_colors-3e09d74f4267fb59.rlib
+│           │   ├── libowo_colors-3e09d74f4267fb59.rmeta
+│           │   ├── libproc_macro2-378d9a773d1eff57.rlib
+│           │   ├── libproc_macro2-378d9a773d1eff57.rmeta
+│           │   ├── libproc_macro2-a0081318f4046a08.rlib
+│           │   ├── libproc_macro2-a0081318f4046a08.rmeta
+│           │   ├── libquote-31403cb87be77403.rlib
+│           │   ├── libquote-31403cb87be77403.rmeta
+│           │   ├── libquote-ced6e083254f7670.rlib
+│           │   ├── libquote-ced6e083254f7670.rmeta
+│           │   ├── libregex-45299dc7582afab9.rlib
+│           │   ├── libregex-45299dc7582afab9.rmeta
+│           │   ├── libregex_automata-1942f8df434f60e3.rlib
+│           │   ├── libregex_automata-1942f8df434f60e3.rmeta
+│           │   ├── libregex_syntax-1e55c064ae9af1da.rlib
+│           │   ├── libregex_syntax-1e55c064ae9af1da.rmeta
+│           │   ├── libsame_file-8be1433ea6eb73e5.rlib
+│           │   ├── libsame_file-8be1433ea6eb73e5.rmeta
+│           │   ├── libserde-a75d532baf2ebf02.rlib
+│           │   ├── libserde-a75d532baf2ebf02.rmeta
+│           │   ├── libserde-aa81dda0afb87afb.rlib
+│           │   ├── libserde-aa81dda0afb87afb.rmeta
+│           │   ├── libserde_core-b468be6fa8c1f936.rlib
+│           │   ├── libserde_core-b468be6fa8c1f936.rmeta
+│           │   ├── libserde_derive-0ebcb0589ed68331.so
+│           │   ├── libserde_derive-f2c17979ef7ac19e.so
+│           │   ├── libserde_json-76dc87088753b61e.rlib
+│           │   ├── libserde_json-76dc87088753b61e.rmeta
+│           │   ├── libserde_spanned-8c742b8b1c4df123.rlib
+│           │   ├── libserde_spanned-8c742b8b1c4df123.rmeta
+│           │   ├── libserde_spanned-b4441ac909dcf315.rlib
+│           │   ├── libserde_spanned-b4441ac909dcf315.rmeta
+│           │   ├── libshlex-7000c8965d055859.rlib
+│           │   ├── libshlex-7000c8965d055859.rmeta
+│           │   ├── libstrsim-c08dd8085d3211b0.rlib
+│           │   ├── libstrsim-c08dd8085d3211b0.rmeta
+│           │   ├── libsyn-6acf1308754e35ed.rlib
+│           │   ├── libsyn-6acf1308754e35ed.rmeta
+│           │   ├── libsyn-f2b7cafe1ab4be3a.rlib
+│           │   ├── libsyn-f2b7cafe1ab4be3a.rmeta
+│           │   ├── libtoml-54fe52e7e2822535.rlib
+│           │   ├── libtoml-54fe52e7e2822535.rmeta
+│           │   ├── libtoml-b1579a35123f20ba.rlib
+│           │   ├── libtoml-b1579a35123f20ba.rmeta
+│           │   ├── libtoml_datetime-27abc01a5f0d37d8.rlib
+│           │   ├── libtoml_datetime-27abc01a5f0d37d8.rmeta
+│           │   ├── libtoml_datetime-d38f09d5eb46495d.rlib
+│           │   ├── libtoml_datetime-d38f09d5eb46495d.rmeta
+│           │   ├── libtoml_edit-49c2041c65200ce3.rlib
+│           │   ├── libtoml_edit-49c2041c65200ce3.rmeta
+│           │   ├── libtoml_edit-5b1a47726612edde.rlib
+│           │   ├── libtoml_edit-5b1a47726612edde.rmeta
+│           │   ├── libtoml_write-02328d233e8995a2.rlib
+│           │   ├── libtoml_write-02328d233e8995a2.rmeta
+│           │   ├── libtree_sitter-6f63d2da46f3f021.rlib
+│           │   ├── libtree_sitter-6f63d2da46f3f021.rmeta
+│           │   ├── libtree_sitter_python-c164dc71d4d224f3.rlib
+│           │   ├── libtree_sitter_python-c164dc71d4d224f3.rmeta
+│           │   ├── libunicode_ident-1e23094c28f51ebc.rlib
+│           │   ├── libunicode_ident-1e23094c28f51ebc.rmeta
+│           │   ├── libutf8parse-7f1dc3de1001f5c9.rlib
+│           │   ├── libutf8parse-7f1dc3de1001f5c9.rmeta
+│           │   ├── libwalkdir-f5c7c686bd134ae6.rlib
+│           │   ├── libwalkdir-f5c7c686bd134ae6.rmeta
+│           │   ├── libwinnow-6083402f0710a47c.rlib
+│           │   ├── libwinnow-6083402f0710a47c.rmeta
+│           │   ├── libzmij-9d3e9e7b02b1a066.rlib
+│           │   ├── libzmij-9d3e9e7b02b1a066.rmeta
+│           │   ├── memchr-e16633741164b756.d
+│           │   ├── owo_colors-3e09d74f4267fb59.d
+│           │   ├── proc_macro2-378d9a773d1eff57.d
+│           │   ├── proc_macro2-a0081318f4046a08.d
+│           │   ├── quote-31403cb87be77403.d
+│           │   ├── quote-ced6e083254f7670.d
+│           │   ├── regex-45299dc7582afab9.d
+│           │   ├── regex_automata-1942f8df434f60e3.d
+│           │   ├── regex_syntax-1e55c064ae9af1da.d
+│           │   ├── same_file-8be1433ea6eb73e5.d
+│           │   ├── serde-a75d532baf2ebf02.d
+│           │   ├── serde-aa81dda0afb87afb.d
+│           │   ├── serde_core-b468be6fa8c1f936.d
+│           │   ├── serde_derive-0ebcb0589ed68331.d
+│           │   ├── serde_derive-f2c17979ef7ac19e.d
+│           │   ├── serde_json-76dc87088753b61e.d
+│           │   ├── serde_spanned-8c742b8b1c4df123.d
+│           │   ├── serde_spanned-b4441ac909dcf315.d
+│           │   ├── shlex-7000c8965d055859.d
+│           │   ├── strsim-c08dd8085d3211b0.d
+│           │   ├── syn-6acf1308754e35ed.d
+│           │   ├── syn-f2b7cafe1ab4be3a.d
+│           │   ├── toml-54fe52e7e2822535.d
+│           │   ├── toml-b1579a35123f20ba.d
+│           │   ├── toml_datetime-27abc01a5f0d37d8.d
+│           │   ├── toml_datetime-d38f09d5eb46495d.d
+│           │   ├── toml_edit-49c2041c65200ce3.d
+│           │   ├── toml_edit-5b1a47726612edde.d
+│           │   ├── toml_write-02328d233e8995a2.d
+│           │   ├── tree_sitter-6f63d2da46f3f021.d
+│           │   ├── tree_sitter_python-c164dc71d4d224f3.d
+│           │   ├── unicode_ident-1e23094c28f51ebc.d
+│           │   ├── utf8parse-7f1dc3de1001f5c9.d
+│           │   ├── walkdir-f5c7c686bd134ae6.d
+│           │   ├── winnow-6083402f0710a47c.d
+│           │   └── zmij-9d3e9e7b02b1a066.d
+│           ├── examples
+│           ├── forge
+│           ├── forge.d
+│           ├── incremental
+│           │   ├── forge-1k8wowqu9j42m
+│           │   │   ├── s-hmxxivq1o0-12nhv82-e8u6815o5dhuylmujfhlxrhoj
+│           │   │   │   ├── 0b0etw70q0dmapi04wzpw28l7.o
+│           │   │   │   ├── 0dupzj4px7z5d86tetti0fq2l.o
+│           │   │   │   ├── 0j8zb7qw0ioyn0ohnluuwn5qc.o
+│           │   │   │   ├── 0m5nkbg34aw75wgygevg2w2gk.o
+│           │   │   │   ├── 0or8mxdbq5jesjd0abmgxt4f6.o
+│           │   │   │   ├── 1kcexlaump83dzp09bkclwmo9.o
+│           │   │   │   ├── 1qjmeoeq3fo4ro614pth82njt.o
+│           │   │   │   ├── 1s0kdyfu6dbln7v4415oxw7rc.o
+│           │   │   │   ├── 1xqs6ud28ch2q695e6grdncga.o
+│           │   │   │   ├── 1zktb3pk5rm6zlgrm5eza70ff.o
+│           │   │   │   ├── 26yqtvmttwr1r0i358lqqzjui.o
+│           │   │   │   ├── 2jk8c27vphbfryllr82kd0ba6.o
+│           │   │   │   ├── 2x3wn6frfdbmo4vs0afzsweoa.o
+│           │   │   │   ├── 36obithfs0sqfch0gz21vmtf5.o
+│           │   │   │   ├── 3j1t5eh7iux9u6nr514hpv7mt.o
+│           │   │   │   ├── 3mf0x3hr75giucsxsqty8qmse.o
+│           │   │   │   ├── 3nalv8mxw5agbxn64z240urgn.o
+│           │   │   │   ├── 3sknt9fkh58gv006ydq9d2qk4.o
+│           │   │   │   ├── 4geq7bwra22bottfa39mypz38.o
+│           │   │   │   ├── 4kb7gwfmt7rdv2dz486ld8lwb.o
+│           │   │   │   ├── 4lzvtfih1apsfrr2iwocecud1.o
+│           │   │   │   ├── 4nor8h3gw95nni1mu4gfpis3r.o
+│           │   │   │   ├── 4r87qkev2vwpvnrdh037rrc7t.o
+│           │   │   │   ├── 4ubwz95cddcnn8tzlc4mmwt4e.o
+│           │   │   │   ├── 4ujqfrcijal24r19go05pu20t.o
+│           │   │   │   ├── 4zp3qaj5np9s4xeltd87vmr1z.o
+│           │   │   │   ├── 5621v7kf7pc6omo4fqjg5nn9j.o
+│           │   │   │   ├── 5azl7xkq8w4dki0ljsj41cbmj.o
+│           │   │   │   ├── 5jjdvugmv854dydxdmlwxrlw5.o
+│           │   │   │   ├── 5k7x24c6p3eo5lb0b50s5my5p.o
+│           │   │   │   ├── 6280ndkilnaj90uiiiny7lo32.o
+│           │   │   │   ├── 65j1saf6ewx3fe5gi9rxzmv46.o
+│           │   │   │   ├── 6hfmvrw890510m5iofftxg4ya.o
+│           │   │   │   ├── 6iy7vaxaraqbo82bgtisf7wh7.o
+│           │   │   │   ├── 6xlgfb0kdbktm42cxya67gewn.o
+│           │   │   │   ├── 6z9ru116zd3ne84hq9ac8a5ev.o
+│           │   │   │   ├── 74en71c1gs1q0wroymkeuiqph.o
+│           │   │   │   ├── 7jqww3mk4ymmywnr5fz5rx7a6.o
+│           │   │   │   ├── 7nk9po459hdr5jc6l3ah990s1.o
+│           │   │   │   ├── 819g9nzbz9fjtdxfxjjjjrm3y.o
+│           │   │   │   ├── 8469wp0e4qen8it14ylq2dq86.o
+│           │   │   │   ├── 8a4320tkik7oep8o3w8vslrnk.o
+│           │   │   │   ├── 8dnn0q7qd3a9bwgnmt9q59hay.o
+│           │   │   │   ├── 8wwhsva3whffsi5cb0trdhs22.o
+│           │   │   │   ├── 90mqkygr4ur6qw4cs2ysm2q50.o
+│           │   │   │   ├── 93leialql8jvzgxxgolqifwlk.o
+│           │   │   │   ├── 9gywew1wppkraxbg8w70ggqfd.o
+│           │   │   │   ├── 9weqqwjh1jsb0fzjnn1gat5g7.o
+│           │   │   │   ├── a94bckpczpw67pr549insljze.o
+│           │   │   │   ├── aczcs1rhpxo4ak9eavozz4n02.o
+│           │   │   │   ├── aob16wmgjxi12cithrvhh6xud.o
+│           │   │   │   ├── avfhfuy0j5vsugufauqtbsf9c.o
+│           │   │   │   ├── ax0txteoo2yrpho5b5mvhbghq.o
+│           │   │   │   ├── axz5xl0hova9qy53v2pzrtw4c.o
+│           │   │   │   ├── b56c2s5dtgixup5v3p07ekw6h.o
+│           │   │   │   ├── b5ex85j02fqjhiexcfm0stqh5.o
+│           │   │   │   ├── b71xer6y2q9txebc6jkl86gos.o
+│           │   │   │   ├── bi393ha0wtu5hclhli7gh1j7m.o
+│           │   │   │   ├── bisi4ymzf8yie5l45g2d7zsri.o
+│           │   │   │   ├── bojm610tov7orohu85sbhs9wd.o
+│           │   │   │   ├── bz61knbw5v0gta9ejiery9uz5.o
+│           │   │   │   ├── c4f762uzapsn3rhk4krdmiskw.o
+│           │   │   │   ├── ca1a2eorig7dq8i7crlp9tms6.o
+│           │   │   │   ├── cj2cdrnvd21bkjo0nhc8h274f.o
+│           │   │   │   ├── ckou8hbkw47u9lu210w2asfei.o
+│           │   │   │   ├── cp4q2bbu5ow17uofbo2j2nc27.o
+│           │   │   │   ├── cpx6690nek5csfoy9ki6vg6nl.o
+│           │   │   │   ├── crweczjr31aopzxrl18m6gi4y.o
+│           │   │   │   ├── csexj22z0vfetub4nq2y5lc4h.o
+│           │   │   │   ├── csnzr0penueytbbrwy29nehle.o
+│           │   │   │   ├── dblqvq9nbh3nyc0k5k3372a2x.o
+│           │   │   │   ├── dc73t6im56e1nnrfhqde8v1f3.o
+│           │   │   │   ├── dcq5835aqd7830j6qs9vvf7km.o
+│           │   │   │   ├── de4zdj8qotdjbb8lppo5phi4n.o
+│           │   │   │   ├── de5jq2ev482zqzmjr0qio8516.o
+│           │   │   │   ├── dep-graph.bin
+│           │   │   │   ├── dfvkl1qdv0t4tt8l4pxb0hq69.o
+│           │   │   │   ├── dkjyk3jeu5s0tvv1pyj4qxx6q.o
+│           │   │   │   ├── dohiuzirsypzih4pkjve17qn6.o
+│           │   │   │   ├── dw6ivczgfzh4524rdijp8kkdp.o
+│           │   │   │   ├── e5b1utq37jv3c0ga4b1scm5vq.o
+│           │   │   │   ├── e77q0o5qf9v0x2uxhr2gzkq43.o
+│           │   │   │   ├── er6f4h1thk7ulxhmdcouuom4t.o
+│           │   │   │   ├── f23vrwevdxj6zr0toejxdfazr.o
+│           │   │   │   ├── f4dkyt9b6mcldlvqhugwjrv76.o
+│           │   │   │   ├── query-cache.bin
+│           │   │   │   └── work-products.bin
+│           │   │   └── s-hmxxivq1o0-12nhv82.lock
+│           │   ├── forge_cfg-3t914kyywa4dm
+│           │   │   ├── s-hmxxfpbhq0-0mmiqco-dtjy4d1dh77zhhy8731rb0750
+│           │   │   │   ├── 1uud0yz7nfpi8wzuyf7vxnxjn.o
+│           │   │   │   ├── 1wxocd5fdvezeiwhnypj7jick.o
+│           │   │   │   ├── 21sm8ydqmkj2glpf0l6j6vi66.o
+│           │   │   │   ├── 3rtdiweoi5env88st77l343iu.o
+│           │   │   │   ├── 42286yzpycp57ktr82sem71nk.o
+│           │   │   │   ├── 45os7v9l9lqlzenc85mmxm8q8.o
+│           │   │   │   ├── 53je1aey5vbs6qd7sa67bcqcf.o
+│           │   │   │   ├── 5tl2g30r4xevno98qwj5qf8ma.o
+│           │   │   │   ├── 7dsfe7oy71kglz8rvbpw0tqut.o
+│           │   │   │   ├── 7mjtbg82hja1bmm3ongy6g16j.o
+│           │   │   │   ├── 9bsjuigs7y9qcnlna0mlmogz3.o
+│           │   │   │   ├── ar81hl5nv37n1c83hovw32nxt.o
+│           │   │   │   ├── bma5ltqr3bvxa7w2xz4v942t8.o
+│           │   │   │   ├── cig7hsr4lgxd965vmepjzj1jk.o
+│           │   │   │   ├── dep-graph.bin
+│           │   │   │   ├── etnx359v7a6psc7x2q347kxc6.o
+│           │   │   │   ├── metadata.rmeta
+│           │   │   │   ├── query-cache.bin
+│           │   │   │   └── work-products.bin
+│           │   │   └── s-hmxxfpbhq0-0mmiqco.lock
+│           │   ├── forge_cfg-3uldnnamd4v11
+│           │   │   ├── s-hmxxeso2r8-0tn0nq1-bwnetrbanegwvkv2axhfb9hyz
+│           │   │   │   ├── 0o7usmeoypbrlzoet6r1qmsgj.o
+│           │   │   │   ├── 0z6sxtnjov9r0f2emuqremmvz.o
+│           │   │   │   ├── 3g0sm44m0ejjsbt98s9ppuqff.o
+│           │   │   │   ├── 3ju9ooi6xpm3qexdw4owt0oke.o
+│           │   │   │   ├── 5x0q3dx8xfpezfo63v4ykpjpt.o
+│           │   │   │   ├── 60glnoa9ycy3gz977j8xwnldr.o
+│           │   │   │   ├── 6hc5j587f2qi0vn83n9226w6c.o
+│           │   │   │   ├── 7axat3huqwg13hsq1hb3895c3.o
+│           │   │   │   ├── a14wqp0ey9syjckgzejs97qr8.o
+│           │   │   │   ├── awv7pregkv1pytra32dcyc7e2.o
+│           │   │   │   ├── bdpey7alv29fo8b3lx8qb39vg.o
+│           │   │   │   ├── c3i35di6w2f38lojuzpca58d4.o
+│           │   │   │   ├── crl63vqat0pak9p0u3v4dm1ug.o
+│           │   │   │   ├── dep-graph.bin
+│           │   │   │   ├── dl4xt1vn3arbtjtpf4kx2cck9.o
+│           │   │   │   ├── dq7o17p63bkg10veo84li3gmu.o
+│           │   │   │   ├── metadata.rmeta
+│           │   │   │   ├── query-cache.bin
+│           │   │   │   └── work-products.bin
+│           │   │   └── s-hmxxeso2r8-0tn0nq1.lock
+│           │   ├── forge_core-1m4efga23xsx1
+│           │   │   ├── s-hmxxfn5z44-0gfjkgk-eoeavihkidk2bddiczofld0r2
+│           │   │   │   ├── 078g8ki80zpzgdviu8wx4okp4.o
+│           │   │   │   ├── 098qyua6h2zs63thmdunux4bd.o
+│           │   │   │   ├── 09vo6v4721lue2tveo0kbq1jv.o
+│           │   │   │   ├── 0ao2jfia5vwje4xekazf0i2ym.o
+│           │   │   │   ├── 0hzxhxmlmi7bp1r5ppotqd34z.o
+│           │   │   │   ├── 0j92lz09fyioi1wo20z11ilzu.o
+│           │   │   │   ├── 0ji7qwrin1nfh6e2uoputaxvz.o
+│           │   │   │   ├── 0x0g4exsjplgsydv0r0xf66ej.o
+│           │   │   │   ├── 10vir5havwoyjk755eun13n0v.o
+│           │   │   │   ├── 14n9i5fo7ph6yzsoo9l3df7px.o
+│           │   │   │   ├── 1i8j2gh5b5y4ojdesrzqsaghm.o
+│           │   │   │   ├── 1lcxebn2wnukcl998vwlz5rus.o
+│           │   │   │   ├── 1mpjp263h3i0lrlwp2tpjjli6.o
+│           │   │   │   ├── 1pu1u8975te63j7o2az1jczan.o
+│           │   │   │   ├── 1sbgpe0autnpfshmdt09scx6o.o
+│           │   │   │   ├── 20jlq1p3k9iinygzdoxjps1h2.o
+│           │   │   │   ├── 22pog7iazemiymfc207e778lv.o
+│           │   │   │   ├── 23as5qp6uq0o7azl0a1v93ij9.o
+│           │   │   │   ├── 29lxrfflwqwjyrxwee9d2lfm4.o
+│           │   │   │   ├── 2hzovmz3k524247vpou98j6c7.o
+│           │   │   │   ├── 2k41x6k71lt8uu3u3elzltxjf.o
+│           │   │   │   ├── 2mxzuzylvdzkxadqbuc7jdwnn.o
+│           │   │   │   ├── 35uvshukehapwysq39hzyoger.o
+│           │   │   │   ├── 3iyriasfxxntm3a1fm9opbult.o
+│           │   │   │   ├── 3juf15wzi0pykxufxnoi81k66.o
+│           │   │   │   ├── 3npfz42zt2w7ukrjzafev3cok.o
+│           │   │   │   ├── 3osvo887kl6imkra6urbq4w5d.o
+│           │   │   │   ├── 3z78g5g8wx5zlsfuhdrs1j002.o
+│           │   │   │   ├── 44qyh09b1o3nrx1trp6c8ojb4.o
+│           │   │   │   ├── 45q1tx3cdeo4gzas14gjwq6a7.o
+│           │   │   │   ├── 4b7ws51n02de763gh89rt43r8.o
+│           │   │   │   ├── 4b9tpyfkvaoylylzn9q8kdvcy.o
+│           │   │   │   ├── 4ecv7sc07jpt0oafmgyue1r0b.o
+│           │   │   │   ├── 4hsjxzg790dbumjnbuslej6lp.o
+│           │   │   │   ├── 50ce3m1kehppu3l2b9btlwp0c.o
+│           │   │   │   ├── 54gxtvqhc1lsobwzmlam55ylt.o
+│           │   │   │   ├── 5k5fshi2j64qsuahc6m4ajh7f.o
+│           │   │   │   ├── 5mn98qc1oet8xw3gs0l4stjmv.o
+│           │   │   │   ├── 6395051pja0ebph5o051xt02j.o
+│           │   │   │   ├── 64qpfybyhzddllfvk78440dhr.o
+│           │   │   │   ├── 6nskdqiy2tz7nea767c29mra1.o
+│           │   │   │   ├── 6pdw3ewa0rdua8u7okq17osd5.o
+│           │   │   │   ├── 6xdtrog3mvj2gjxy7whx24z98.o
+│           │   │   │   ├── 6zsmdy9s73frmbl9hdak24hz5.o
+│           │   │   │   ├── 73ljvxufo9km0ba6v1yov2ddi.o
+│           │   │   │   ├── 77slooh0x77a1dan860fdeo6m.o
+│           │   │   │   ├── 7dsksx2fio5uf392ihaotzfsa.o
+│           │   │   │   ├── 7hzuz50v4pdzr473ao3l3ixam.o
+│           │   │   │   ├── 7r9noq20l3vh5wxwtzk6cfasv.o
+│           │   │   │   ├── 8e4w5eam8rg9k5pulmkbnyxo2.o
+│           │   │   │   ├── 8l1sfo8ad3fe61tyj3a2x5du5.o
+│           │   │   │   ├── 8sf6d3ilazwcmum8mfsq8ir9t.o
+│           │   │   │   ├── 8zukad1qbamvi1mnzqg8xqt68.o
+│           │   │   │   ├── 92qqank9595fund0ube5r0si0.o
+│           │   │   │   ├── 96drsd2seb80d66hu1jlw46o3.o
+│           │   │   │   ├── 9hy2b12bdx4vdy7w0fvtjtqb5.o
+│           │   │   │   ├── 9mqgjx312dosqulrggmpbqo02.o
+│           │   │   │   ├── 9w9uvtvo2ahs2zbtazpoe7ne0.o
+│           │   │   │   ├── 9z91pe1x0hr17umqia3xr3tfl.o
+│           │   │   │   ├── a2cymq1los0a0ms3nn6xg3z35.o
+│           │   │   │   ├── afsu8zjaqwgsrmfu9ptt9gx19.o
+│           │   │   │   ├── ana0i32unfxr4ng7y3yfnmz6p.o
+│           │   │   │   ├── aoyfekg3ww9n6f7zt1mmkhmrq.o
+│           │   │   │   ├── asg1nckkyhxarlw0ov3px6xsh.o
+│           │   │   │   ├── avsqus2ujrwijjtsxzrncvjv2.o
+│           │   │   │   ├── b4le68p9h7dxvvw9y1swyd46j.o
+│           │   │   │   ├── b9epfj3bpy7y6df9wy59r8f58.o
+│           │   │   │   ├── bc0egitaz0hv9rl5t01vzoph4.o
+│           │   │   │   ├── bcsff5icif8nn835zfo3dyazt.o
+│           │   │   │   ├── bmgzg32wvlc12wn4vy1f9tyh0.o
+│           │   │   │   ├── buhzqgq3jrh0ijoqygkh0uslv.o
+│           │   │   │   ├── ca0ls10lq3qivkghqilioclxl.o
+│           │   │   │   ├── cdaisxb6irqy9id9g7sb5wf9i.o
+│           │   │   │   ├── cluf13vum23otnvkzvowmbvvu.o
+│           │   │   │   ├── cmj94a7ob47kfytvp6t2wm9te.o
+│           │   │   │   ├── cqbqbd88oiwk5gwt5gfttnszz.o
+│           │   │   │   ├── d6onyu7a22dc9axg4gqvn3f2d.o
+│           │   │   │   ├── dahb5m2ufm5defng4imca1zx4.o
+│           │   │   │   ├── dep-graph.bin
+│           │   │   │   ├── deqsxqlum3q5q8j43ne5cxk6j.o
+│           │   │   │   ├── dry2c2e4k6w84dxitebekufy3.o
+│           │   │   │   ├── dwrqmk6583ocfg6ij2tnq7j1o.o
+│           │   │   │   ├── dx0wvrceuxnxhx5956fx3zgsa.o
+│           │   │   │   ├── e0yfml1yca37tatj3pao3g6ai.o
+│           │   │   │   ├── e62jv1i6sdvorq5eafgjwht7e.o
+│           │   │   │   ├── e6jgtdwy4yqjn4kb2vp1p7so8.o
+│           │   │   │   ├── eyvbq4zsy0vsd61fsiqrbqp9t.o
+│           │   │   │   ├── f2ujurxqezf98tgi79j5hsvy7.o
+│           │   │   │   ├── f3qvlqgwp2uym5gt992styewp.o
+│           │   │   │   ├── f456aqppfd1o2bf1u7ravpnng.o
+│           │   │   │   ├── metadata.rmeta
+│           │   │   │   ├── query-cache.bin
+│           │   │   │   └── work-products.bin
+│           │   │   └── s-hmxxfn5z44-0gfjkgk.lock
+│           │   ├── forge_core-1m9k0ps0s4o44
+│           │   │   ├── s-hmxxeppm2x-141o89r-0zq7yehz82uzabibpityxveij
+│           │   │   │   ├── 0fozecvpaae2iv25by4fks787.o
+│           │   │   │   ├── 0ifrd0wu9hw7a2y9aipnaio52.o
+│           │   │   │   ├── 0jnwu1e72vfwme5udhjzkvyuk.o
+│           │   │   │   ├── 0pxtfq00rx8s2irp2qlf2dbuv.o
+│           │   │   │   ├── 0umgio0ral19cupjxdkg5n0nl.o
+│           │   │   │   ├── 0vxttlvvv5hz9kv3n3sob9zmj.o
+│           │   │   │   ├── 0zre19726gdtv7m6hf9uzdf9j.o
+│           │   │   │   ├── 1031li4u55tn42p2iuqaoacwn.o
+│           │   │   │   ├── 13xvpcwnl7ff9fxiowbo8tdih.o
+│           │   │   │   ├── 15xom5cj0hw0npfbm96ps4b2c.o
+│           │   │   │   ├── 16z0sqc1qy9c1ftn5v0cvr3cs.o
+│           │   │   │   ├── 1s183qnzpmhl72v6gisli13fy.o
+│           │   │   │   ├── 1ska6tidij9rhpwvzsk5bayf4.o
+│           │   │   │   ├── 1tkmv0kl2boos5hweito0ykra.o
+│           │   │   │   ├── 1w2wgn8bbwskcfco01anwnyi6.o
+│           │   │   │   ├── 2bikvfckeoyk4dng0bgvfeq0w.o
+│           │   │   │   ├── 2fwa2z2j8wbpeez9g0jtl3gn2.o
+│           │   │   │   ├── 2gw7lj172wz0g1w6c244hk35p.o
+│           │   │   │   ├── 2lyj7p18hssy8j9t4yl72xudw.o
+│           │   │   │   ├── 2tp8tshgrcu3lhs3rzd8mndhi.o
+│           │   │   │   ├── 2uflk3lw9wwbafwgdpt5u38wc.o
+│           │   │   │   ├── 32v007cddn7h59k0xo9m9t3r3.o
+│           │   │   │   ├── 38xr9y2hzj8z7t3i792amodgp.o
+│           │   │   │   ├── 3ktk9euy0iyya8sxgjlsiuw59.o
+│           │   │   │   ├── 3p0bgxm3uz6v2rxqm7ecgli0j.o
+│           │   │   │   ├── 3rdl2wivtaweez66e7n96hk6s.o
+│           │   │   │   ├── 490ww9lup4eixzx47qqsz8koh.o
+│           │   │   │   ├── 4ckd0rvfijgswqu0qn8apx3hl.o
+│           │   │   │   ├── 4gie91fzi2tmp3024d9kynus3.o
+│           │   │   │   ├── 4qqbi5twy668ozszajh9axmdi.o
+│           │   │   │   ├── 4um7xlju3v72tbpgq3h6fbh1j.o
+│           │   │   │   ├── 4v9m0a6j7pf2tnesbtqysf7yg.o
+│           │   │   │   ├── 58uhyhx12se0am04pbv2j1c2u.o
+│           │   │   │   ├── 5bqyom15yndiaxcb4sao55bjf.o
+│           │   │   │   ├── 5h8vv3bh4k0f6kproybks9im3.o
+│           │   │   │   ├── 5k743jqnih6nz4uy5w1v804rx.o
+│           │   │   │   ├── 5raz05fw7965aucjj5tyseaay.o
+│           │   │   │   ├── 5vjebsr820xqqnfzz67uwsxhl.o
+│           │   │   │   ├── 65rdl93fq3ri15gkb4k4vf5vw.o
+│           │   │   │   ├── 6dqi3p2unl8tqf1j3kywftypc.o
+│           │   │   │   ├── 6i2uhfmvcokeqgiowf0sjlm62.o
+│           │   │   │   ├── 6m5x2ku5a6cmzj86q6vx1l3ou.o
+│           │   │   │   ├── 6rm41wrndfo6crf16s66erz88.o
+│           │   │   │   ├── 724br695wrwhgu5km2ql0x9hi.o
+│           │   │   │   ├── 784fxwbfe8d2a3yegt0ohocgm.o
+│           │   │   │   ├── 7ewx43h1e3y1yunae2cmyw5ga.o
+│           │   │   │   ├── 7qm813avsvpl1wbgty13hkspu.o
+│           │   │   │   ├── 7z6dvh09jyxrdg5sqz67ct42h.o
+│           │   │   │   ├── 84ndmc53dq93905apv4k634of.o
+│           │   │   │   ├── 89f6keob750g1mqjg0262bba3.o
+│           │   │   │   ├── 8f6liaec1h4x157dzofxjjclo.o
+│           │   │   │   ├── 8gch31zcgg8qtrm1a9gcoy7yv.o
+│           │   │   │   ├── 8ltjl3txi6lpktykel4q1njsq.o
+│           │   │   │   ├── 8pe5cv94npi11qpoj8zw97zyx.o
+│           │   │   │   ├── 8tvqnob0bwfpzk0f756khqlpt.o
+│           │   │   │   ├── 8vrj2cmuqrwkdo75c676x8f3b.o
+│           │   │   │   ├── 90oxzy78osi4oacnrqf0dpkug.o
+│           │   │   │   ├── 927n9gd5297ximxzncuairujm.o
+│           │   │   │   ├── 97ent8fe2c0bbhl2eu55m73vm.o
+│           │   │   │   ├── 9i85afcp0rz0k1sfzc9e227kc.o
+│           │   │   │   ├── 9kluar54qpm3z8ya4stu7xp91.o
+│           │   │   │   ├── 9op198htff8tcgnarj6260jue.o
+│           │   │   │   ├── 9qr2do9g3abni2zwo9pgofi4l.o
+│           │   │   │   ├── 9vbryy0bqosqaq7tjjhhdw8fr.o
+│           │   │   │   ├── 9xx1zfrwmsabvyl9z17pmk5vq.o
+│           │   │   │   ├── a5m1e135xhm265gx0o115b4fz.o
+│           │   │   │   ├── acgl8esidq58qw2bw5smzt1ic.o
+│           │   │   │   ├── aoccqfeee1jaaafshu77xq2jw.o
+│           │   │   │   ├── b2xqu5ky7vb421l9iagrv9pt1.o
+│           │   │   │   ├── b92xekkbb1d1s4xpec0ylr9q5.o
+│           │   │   │   ├── bq4amph2zkhw2klwy8uwlits2.o
+│           │   │   │   ├── buce6hx7r8blepqbmitsd61cn.o
+│           │   │   │   ├── bxp7a518lgc64lilhpur65u16.o
+│           │   │   │   ├── bzk7kfiz1r40ylrw06a0oc4h2.o
+│           │   │   │   ├── c0cuf1r3j9w9fahy4cjelpl0c.o
+│           │   │   │   ├── c4tds3915mnwcgwnuev1en7l9.o
+│           │   │   │   ├── ctii31434pxe7ibqqu0isc6mc.o
+│           │   │   │   ├── cv6a2e1eu4z1ljwovfs8uohnf.o
+│           │   │   │   ├── cwe8otvzp4mwdaav8noswlf6f.o
+│           │   │   │   ├── dep-graph.bin
+│           │   │   │   ├── e6cqzr0b8lppeqlj3l3ye2nj7.o
+│           │   │   │   ├── e90k97vphjkmzq39cdh40reun.o
+│           │   │   │   ├── ea6gpgjwvm1sg0udfwjcakscz.o
+│           │   │   │   ├── eckud68cl5wh5gp8v79y5slbr.o
+│           │   │   │   ├── edec3275msjcuiswys0w9eh1c.o
+│           │   │   │   ├── eifhq7qavrnru2gruw5efkjh7.o
+│           │   │   │   ├── ek5yk55wqwgbesltpc4muj0yb.o
+│           │   │   │   ├── epczjwgpk1wxobc4zgm56uek1.o
+│           │   │   │   ├── ewjyy1ln7554qiwimva228494.o
+│           │   │   │   ├── f408c0z4huvq3j95mgu5inpbe.o
+│           │   │   │   ├── metadata.rmeta
+│           │   │   │   ├── query-cache.bin
+│           │   │   │   └── work-products.bin
+│           │   │   └── s-hmxxeppm2x-141o89r.lock
+│           │   ├── forge_lint-0lqey7w30n7u9
+│           │   │   ├── s-hmxxipv172-0fs49cp-4m7vdozmx7banu3xqgl1krqmm
+│           │   │   │   ├── 093nft93e3ku2d38deira0nb3.o
+│           │   │   │   ├── 09atifjg9mejt4wrwn0jj63kz.o
+│           │   │   │   ├── 0et4db71x0d9lof5fbxkou1p9.o
+│           │   │   │   ├── 0fj9t3zdzsg469pjna4s13ccp.o
+│           │   │   │   ├── 0s5g6d6jihyjy7tt04tfrfg43.o
+│           │   │   │   ├── 15au4krrkydxtbitq90ahi5ts.o
+│           │   │   │   ├── 175yxa9nep0udfiqgrbn73uy5.o
+│           │   │   │   ├── 1hxjfk56v4hmobhz8cz1d8jf4.o
+│           │   │   │   ├── 1i07ngb4y4uuajililzgiyck2.o
+│           │   │   │   ├── 1nn5uwhuxj5a0f9kizeties46.o
+│           │   │   │   ├── 1tm253m07heumnd8x8bfb3b44.o
+│           │   │   │   ├── 1urc5a2zu0v8ercrdu3nxfomt.o
+│           │   │   │   ├── 22mv5g650tmt3ekbv2gxjnldy.o
+│           │   │   │   ├── 2b00jjixr2rt4870584tumeou.o
+│           │   │   │   ├── 2fiwm6r7uhcw9rb6fi28sly8s.o
+│           │   │   │   ├── 2ma3qjxwghfonho46i54vefzv.o
+│           │   │   │   ├── 2p2t27kdkum1igy40ebm5f3pi.o
+│           │   │   │   ├── 34sbxs6w1nu6rjrkzv2zl222i.o
+│           │   │   │   ├── 3fyl80w98ulhzgg5k7mt6gnvt.o
+│           │   │   │   ├── 3l7mjlxaa8l7lw4ictb270ewv.o
+│           │   │   │   ├── 3l7nsflb3rkt46k5tk2w6dwjs.o
+│           │   │   │   ├── 3rfwfwtvv8x51jotxy51n6x01.o
+│           │   │   │   ├── 3rvkcw3dgzz46w8vka8pdsn1a.o
+│           │   │   │   ├── 42jxe74fh9z840lwo0y9cg4iq.o
+│           │   │   │   ├── 46c6kec3opgjk763mvx8apubq.o
+│           │   │   │   ├── 483mjzhrogfpn4yww1qrr5rs2.o
+│           │   │   │   ├── 4affcav25yf87quo8wq5dbtbb.o
+│           │   │   │   ├── 4ci0ompglarkwkanms3x2ors5.o
+│           │   │   │   ├── 4o99v0ipa6k1rd7ja1p9ducuh.o
+│           │   │   │   ├── 4pcd9v3qr5fwbqif2p5rn45kz.o
+│           │   │   │   ├── 4rd4d50cgiuttu3u3eni5siga.o
+│           │   │   │   ├── 4tqffg0sg3bkdu0w9ndp7bd81.o
+│           │   │   │   ├── 4yiskb4qnjjs7836mx6uym6cw.o
+│           │   │   │   ├── 55b0peh9rsgxrz087foeq5u2r.o
+│           │   │   │   ├── 58307aoco9ra2f95n7vh1wxdz.o
+│           │   │   │   ├── 5b13ibblebg6x0p5mrnezflso.o
+│           │   │   │   ├── 5bjo9hav8xn26akgnw23mtyx4.o
+│           │   │   │   ├── 5pk5f1vgnuov58qh3ismizj2x.o
+│           │   │   │   ├── 5q4n0iryye0fpskvcib53qsp9.o
+│           │   │   │   ├── 5y38oadsptsld52yonjq11ulj.o
+│           │   │   │   ├── 69wv0dallebzba343or149nxs.o
+│           │   │   │   ├── 6g78t6r1lby25aa4ngqrc30rx.o
+│           │   │   │   ├── 6o7jlf9mdgy7y80o8uwv9cla7.o
+│           │   │   │   ├── 6xr7cdg3m4grw99j6592e9cqz.o
+│           │   │   │   ├── 6zl01wr83uwtbzrbdslo2owkm.o
+│           │   │   │   ├── 78xc402tb5g15g47zv2w7ir60.o
+│           │   │   │   ├── 7erxp14iz3h73e0khikk61d5z.o
+│           │   │   │   ├── 7fqvfuvg9qcs7afgtfcce0ei6.o
+│           │   │   │   ├── 7q7p0y9b508q3sstr4v4a5g75.o
+│           │   │   │   ├── 7w18kb7ep5bksz4lzvoetf1uy.o
+│           │   │   │   ├── 7zphdnxieyqlq7l0ugmjrnjp8.o
+│           │   │   │   ├── 817q3nzdpn7d3whmata346itm.o
+│           │   │   │   ├── 83bz0ejuc93xpzbth1bjmh7nq.o
+│           │   │   │   ├── 85ip1xqbnslcqksq7ghvwhfqj.o
+│           │   │   │   ├── 88rdcjwr0zi7msngdi8tj8b0z.o
+│           │   │   │   ├── 89rodt8oac7st10qvziwriugi.o
+│           │   │   │   ├── 8jp8vviph6zsv9lv0ysxq6ej5.o
+│           │   │   │   ├── 8pj0f21y9u6ho5y8nwe2r2xps.o
+│           │   │   │   ├── 8pkz8r60alx6md32632x01lxe.o
+│           │   │   │   ├── 8z6d6q1jkncuk9setiz45mmly.o
+│           │   │   │   ├── 954d3czgcupqhd1mdccza16t0.o
+│           │   │   │   ├── 9561i41h25nef9wrynzot6zzd.o
+│           │   │   │   ├── 968f0oge570h1mt1lk63jfjtt.o
+│           │   │   │   ├── 97x0xstxd82o940ekp5elqukm.o
+│           │   │   │   ├── 9cyaxjboq8q28t8i640qn62aw.o
+│           │   │   │   ├── 9gw9177cgawsho8c2i4hssrzj.o
+│           │   │   │   ├── 9whfbuocpuddp03bu04z63baa.o
+│           │   │   │   ├── a88dxaqhxptl7sojbbk9wrpwi.o
+│           │   │   │   ├── aawwd69i6y24fj39bi7quuwj0.o
+│           │   │   │   ├── acplv0tec0apwwk9bf0ii7pfn.o
+│           │   │   │   ├── ae022e2uobzvh3hn412hhvihc.o
+│           │   │   │   ├── an2o6ix1nz3bv24fd2gspa73i.o
+│           │   │   │   ├── aosxmed11cvgs4bplx4hvv2hw.o
+│           │   │   │   ├── ap6wfuzkkgkc1a2uuveftveh9.o
+│           │   │   │   ├── ascq957emsu7axcdi7t1e103o.o
+│           │   │   │   ├── asli6892i7diizyi4j0s7g4pm.o
+│           │   │   │   ├── avyp65rti0nacf9zl96tow962.o
+│           │   │   │   ├── awu16t36z26lbm4v0h9rfjm2l.o
+│           │   │   │   ├── az7i0ssr717vk53py7xpdgn3r.o
+│           │   │   │   ├── b0sizomnps57oaohwkhqoxbdd.o
+│           │   │   │   ├── b11ch28a4ca63d6ab5ojsxeph.o
+│           │   │   │   ├── b5y6cjitzbldwzj0f6ktf9eww.o
+│           │   │   │   ├── b65v8uehqtnbtzd5vbootqsg9.o
+│           │   │   │   ├── b898tf470w8jpqtf002t4wx74.o
+│           │   │   │   ├── b8wmbobj423o0xdofb8ee8mor.o
+│           │   │   │   ├── bavrpkdjj7ygmua2d2waidqte.o
+│           │   │   │   ├── bbwk6pthet65u99tgrj7ofg23.o
+│           │   │   │   ├── bdl9hke2f2xrrlyslf9vgy2si.o
+│           │   │   │   ├── bl4h4joonmypf6xhyy7ilmq0t.o
+│           │   │   │   ├── c6mvklmipotd4zm8ikym23he0.o
+│           │   │   │   ├── c7bq0fghuz9bugmukiqsopzhj.o
+│           │   │   │   ├── cgap8k5fahpj9uyectzuv0hlf.o
+│           │   │   │   ├── d2z14ct8p7omy4n1d5yy7lq4l.o
+│           │   │   │   ├── d7dnv2i980vbae4tgbj5qfah8.o
+│           │   │   │   ├── d92fwbw6deywsma2bae1jn921.o
+│           │   │   │   ├── dcfmoy3mty0dfl86070fovyle.o
+│           │   │   │   ├── dd2883cqhkees9qvjku9xpeii.o
+│           │   │   │   ├── dep-graph.bin
+│           │   │   │   ├── dih4l9k8stp26vw78a9yjae8i.o
+│           │   │   │   ├── dqtokel4aapl132so3xr0g844.o
+│           │   │   │   ├── dro89zylj67oceo98h20sa3ry.o
+│           │   │   │   ├── e1s2yhwenpl5ne6dtfyc5gqp7.o
+│           │   │   │   ├── e20k2fbaq038vlka1sodr8g4v.o
+│           │   │   │   ├── effm8n7v79sdu672r7asi461y.o
+│           │   │   │   ├── ej87l5300nz5xvwd6cah2g3uv.o
+│           │   │   │   ├── elxxensllj4rb2yqfmtmk8na9.o
+│           │   │   │   ├── em5y8lymdsm8mglocgkx48soe.o
+│           │   │   │   ├── epzqxfo7tzlom2r9l5mfv4493.o
+│           │   │   │   ├── ezwguty45j7vk8iuusoe64rfg.o
+│           │   │   │   ├── f0ytzof1zgr7twd0zyxnbs2zr.o
+│           │   │   │   ├── query-cache.bin
+│           │   │   │   └── work-products.bin
+│           │   │   └── s-hmxxipv172-0fs49cp.lock
+│           │   ├── forge_lint-1091cce9helsu
+│           │   │   ├── s-hmxxipv1j9-1copde4-9t98czq1bf4bte83b3tans7io
+│           │   │   │   ├── 07gl2ihsfqs1o2jc5q7t4r0us.o
+│           │   │   │   ├── 0e71exn7bvs7qg0rnambwem6r.o
+│           │   │   │   ├── 0eg3ta1xxx3wgivxqq6i4t9it.o
+│           │   │   │   ├── 0ko8znv83olu195r48p7rcrk0.o
+│           │   │   │   ├── 0yilcss9b6i71tc2yzir751pr.o
+│           │   │   │   ├── 0ylr3gg7dpmdfmfetwfxlvcpb.o
+│           │   │   │   ├── 0z1e3tql15wi97eyf8sfsavdy.o
+│           │   │   │   ├── 12j7jwva8hlx1kgf5sh4e7e1y.o
+│           │   │   │   ├── 15xtcb5wfg1bbq9eeesdd75od.o
+│           │   │   │   ├── 1gceeihlcrfvbe6srnd25shnr.o
+│           │   │   │   ├── 1iebwwg2kgw4iwn3dxm9kl9m4.o
+│           │   │   │   ├── 1m9trmbjgryp1pn73h5bzbzln.o
+│           │   │   │   ├── 2h8btxcyrc6ftl7shyr15s2vn.o
+│           │   │   │   ├── 2kjmz2ef7gtkrzbafkslgiith.o
+│           │   │   │   ├── 2mckzunaq1fuoxyquhxgk30kf.o
+│           │   │   │   ├── 2u8dxqw3o0bi7duewwmoiam7y.o
+│           │   │   │   ├── 2yc3kaea9j95f5m0x8hxu4pz2.o
+│           │   │   │   ├── 31fkg4a61sz3kq045kwl7q1fw.o
+│           │   │   │   ├── 32f9z7ts3nqwrtxjuzvby7ges.o
+│           │   │   │   ├── 3695t79lmpkiwomtslcq7i0ua.o
+│           │   │   │   ├── 3aeagzjks6pheyt0c554pbq03.o
+│           │   │   │   ├── 3eqyra6s05lthi3rm6n6rykr1.o
+│           │   │   │   ├── 3o4b6mzts73l2djizrp9cavsx.o
+│           │   │   │   ├── 3xayev5s88v2op6koez2lfgp6.o
+│           │   │   │   ├── 3z19tqc39vf57k9gkupnoaumy.o
+│           │   │   │   ├── 4t53xfxqoepkpk8ftl56sehm2.o
+│           │   │   │   ├── 4w1jcivqp6eq24nmimibmpfo3.o
+│           │   │   │   ├── 53g897sz3pnkkuphldndtib9m.o
+│           │   │   │   ├── 5ikd3iv150ygz6jtn0y5hzy1k.o
+│           │   │   │   ├── 5s3rxcwitdqn14rmt1jdvl60e.o
+│           │   │   │   ├── 60rmtdidhqyx9mryl6hj9kb94.o
+│           │   │   │   ├── 76iwdvve6lgnoe42t4n6zlebs.o
+│           │   │   │   ├── 7q6rwzydl2essowsfxt5truz3.o
+│           │   │   │   ├── 7w5s57l2llulppi0msasix9xr.o
+│           │   │   │   ├── 7wcf1uhgmem1lq0ucr19jzkvo.o
+│           │   │   │   ├── 852h5mi5r0rkc7fg876m2tpwn.o
+│           │   │   │   ├── 89ly6hkjl6f4hmfy49pt76uh6.o
+│           │   │   │   ├── 8e0f9sjmrijtme51k3prw08gx.o
+│           │   │   │   ├── 8vr90y7pm5ei3gryipriuhzir.o
+│           │   │   │   ├── 9bdcttv3ejsj14fos3yw9rs99.o
+│           │   │   │   ├── 9jbyr0uz16jrpd867cwtzf4hw.o
+│           │   │   │   ├── 9vzrozoh6u23sw9wg8r68ete2.o
+│           │   │   │   ├── 9w39vh2ehoevpfpr1esivqebc.o
+│           │   │   │   ├── 9xatso5xwhgpuf1lgge9nzyd7.o
+│           │   │   │   ├── 9yourqp1gyy85lvysrnzabd72.o
+│           │   │   │   ├── a1ci07ncrkubp87dnso9kv7w6.o
+│           │   │   │   ├── a4gp16kko64vde8j6kf4fftml.o
+│           │   │   │   ├── a98voj7svh1o90e1r5dllfc8x.o
+│           │   │   │   ├── acwbfhs0jjo4woo2d2jewje2l.o
+│           │   │   │   ├── anj2fbvvxxn58ao22vtiw3ygk.o
+│           │   │   │   ├── ar81bey7r8z2lx2v11l2qxcnn.o
+│           │   │   │   ├── arcl1nm8ya9q7bbbflkapuqfi.o
+│           │   │   │   ├── as6aazoh6tuajh8opxkk8lr30.o
+│           │   │   │   ├── axkqwyijmyj9jmx71uml35heu.o
+│           │   │   │   ├── b29w40viop42z8l5sz43alw6h.o
+│           │   │   │   ├── bdvb439itek4vjs19xcpwenoc.o
+│           │   │   │   ├── bewwz6ml1ufkooemiudv5hy1f.o
+│           │   │   │   ├── bggoya7a56up0l7z0eq8e6n6p.o
+│           │   │   │   ├── bmzcn4iwng5jzl5vw89c1jt41.o
+│           │   │   │   ├── boccltxvkgyxdk18fu5vohac9.o
+│           │   │   │   ├── by40xj1tz9sba6oip3hhy44jm.o
+│           │   │   │   ├── cco5a60njsquilrd24ftgnm8l.o
+│           │   │   │   ├── cp18qiac4v8138dy9d6gyakg3.o
+│           │   │   │   ├── cqclpit2kao03gswydx57fm1w.o
+│           │   │   │   ├── dep-graph.bin
+│           │   │   │   ├── dhk7y1jiazii53hvbn232zdol.o
+│           │   │   │   ├── dki04tf8vb00vnznh9ywf8tth.o
+│           │   │   │   ├── dkt8h85mh2ly7q6uoy4bmx1jb.o
+│           │   │   │   ├── dn4lw79keiw6x7fhdpaq1cg5o.o
+│           │   │   │   ├── dpbut7bhyak7376cty7pmedxa.o
+│           │   │   │   ├── dqkaznw5p53j18i15srmu60n1.o
+│           │   │   │   ├── duhx06u1fcreb8u1qhw2ctw8y.o
+│           │   │   │   ├── e1a48crct8zxp011tijmoduib.o
+│           │   │   │   ├── e26ho8okos4khuoxqvl5lfov6.o
+│           │   │   │   ├── egmuo9itv6s86hjr26ykzmb8a.o
+│           │   │   │   ├── eigsos7cyz9vee6vjkij1yy11.o
+│           │   │   │   ├── eisds2c7oox1iymxsbd1fuau9.o
+│           │   │   │   ├── epluah732za3bquylm01ftluf.o
+│           │   │   │   ├── et02sv8v4tg8rop63jq4rg4si.o
+│           │   │   │   ├── ezup8tw3xk080qbytjvc116oa.o
+│           │   │   │   ├── f4s0xyoma6mu91v4svgxxzawd.o
+│           │   │   │   ├── f5l6a1qfgogxa5awo2ncybzti.o
+│           │   │   │   ├── metadata.rmeta
+│           │   │   │   ├── query-cache.bin
+│           │   │   │   └── work-products.bin
+│           │   │   └── s-hmxxipv1j9-1copde4.lock
+│           │   ├── forge_lint-1oacpqb4i24an
+│           │   │   ├── s-hmxxiu7u0s-1knazow-clz1zq3xs6ixk4q0yiy0jaw00
+│           │   │   │   ├── 05hj8mhggjh14jchaamidnoc7.o
+│           │   │   │   ├── 08vo8i0ddt5ddlc9h6w4w5fh8.o
+│           │   │   │   ├── 0a7idddejpp86tu1enakg9u3s.o
+│           │   │   │   ├── 0d2o0yf65lcd3lal5stdjcwjw.o
+│           │   │   │   ├── 0pmfazkcicgrpwoh6bfl7edor.o
+│           │   │   │   ├── 1cd8r5cxof776a34ekw36chdh.o
+│           │   │   │   ├── 1jjgz5qjlkyoq1m4eaowykv0i.o
+│           │   │   │   ├── 1o5yfhvhaqg3jp6c164bc2akj.o
+│           │   │   │   ├── 1ogy5jk9sy6spriewyn9invz6.o
+│           │   │   │   ├── 2ga4skm9ojbebcd4dlutri2xd.o
+│           │   │   │   ├── 2q8pxhhop4uc01ea58oyg4gxn.o
+│           │   │   │   ├── 2v8d6hpztjalzgtsjq2mbbn72.o
+│           │   │   │   ├── 2xe14y93eakiublwjn5p027zj.o
+│           │   │   │   ├── 2xl4f70244w564ob60voizwui.o
+│           │   │   │   ├── 31j8x847ffcc0fmj2x6tklklb.o
+│           │   │   │   ├── 3ejw8j7bypwg7p0dbmrgd27jx.o
+│           │   │   │   ├── 3mqv5tgagitt6yx0oznww5294.o
+│           │   │   │   ├── 3q4z6trsm06d4m321qvec7zkd.o
+│           │   │   │   ├── 3wisfy0eefoqtzrhx99f0hft0.o
+│           │   │   │   ├── 481hkq7zvaqj1ukxncnm1xm4g.o
+│           │   │   │   ├── 49z5uet05l73uz8qs6991u40c.o
+│           │   │   │   ├── 4l4uglfgw6h9vt6v9l2k7y63l.o
+│           │   │   │   ├── 50tdhdair4tydqgny8xs7pzzx.o
+│           │   │   │   ├── 55ynooj4rj4nhr9mupc4bwuau.o
+│           │   │   │   ├── 5ao96gtym59wiybftm1tvwxdy.o
+│           │   │   │   ├── 5cinpaoglu1089kwhvns17vwa.o
+│           │   │   │   ├── 5elnip6l8e2681ncy5rqt4roo.o
+│           │   │   │   ├── 5k5neiijvv0abm0jql7astojo.o
+│           │   │   │   ├── 67dj28abc3slqwfdk9sra8s0q.o
+│           │   │   │   ├── 6yukfgxs44se56nxoys80si0n.o
+│           │   │   │   ├── 78bqqclljmsdbzcz5ouew7lzv.o
+│           │   │   │   ├── 7f6tcl25ki5vrj2j922ovejri.o
+│           │   │   │   ├── 7pxtd9elvauvr825o25jb9sjz.o
+│           │   │   │   ├── 7t2ex5ceiv28kqfwrhsuttg0u.o
+│           │   │   │   ├── 818f0v8uj4n7xo7plchga08gh.o
+│           │   │   │   ├── 81b48tfgk4as1r4zvl33giwyn.o
+│           │   │   │   ├── 8ft1m005nyl8zltlfh48fok6z.o
+│           │   │   │   ├── 8hh3ya6rikpv9hsufbhdiqakh.o
+│           │   │   │   ├── 95b8jifp1jsudyui33nxxc4xd.o
+│           │   │   │   ├── 96rwivohyaccith5fmbflpjn4.o
+│           │   │   │   ├── 9jn93xfvdueb62v1mc7uy8lfm.o
+│           │   │   │   ├── 9joo8gkj24estlr2om9e4hied.o
+│           │   │   │   ├── 9ruvui995imvr6lu89utqj2t3.o
+│           │   │   │   ├── 9vja3rh325lfmzhk6i960nk8s.o
+│           │   │   │   ├── a8l058fo94ao59qxqd0e4xndt.o
+│           │   │   │   ├── af5svefdmxyfn3vd60lgvbktb.o
+│           │   │   │   ├── al6i38687z6aexaxr4ibnrhgp.o
+│           │   │   │   ├── b8qq1zcah10elssfjezo7powf.o
+│           │   │   │   ├── b8wb6ae8kee9qfd9p8wny9s3g.o
+│           │   │   │   ├── ba159wajcss4xy1lw1h6kndfb.o
+│           │   │   │   ├── bh7o99ytiy8o68u2jvp6q24xi.o
+│           │   │   │   ├── bojo4mnca1ebkwsdqcx1uj7vk.o
+│           │   │   │   ├── bphc8jrsh6jsiycd683kfp8ld.o
+│           │   │   │   ├── bqwpkysbclcn017ip81b7bq7v.o
+│           │   │   │   ├── bv0a5c530lxs4jzyoa45olx43.o
+│           │   │   │   ├── bwir9dc5z3tcay3lqesphlkkh.o
+│           │   │   │   ├── bzrw08zw1jwm1lm6w7wriglsl.o
+│           │   │   │   ├── bzxmm3mkx6wwawz4eotbg0npq.o
+│           │   │   │   ├── c1j910vubgvyzd77og6yzkr0d.o
+│           │   │   │   ├── c67eo0gs30v9zyj79ajudqko8.o
+│           │   │   │   ├── c7wpa8oyujw1c9bq4y3ln6mse.o
+│           │   │   │   ├── c91p2cogyfqox6e5dtpwb3dd2.o
+│           │   │   │   ├── cay6xs6hnm855fpkg8i6s4ky4.o
+│           │   │   │   ├── ccrd39cltkezltl82kun4fwzs.o
+│           │   │   │   ├── cduxzaq1bogxguer0pv6kdqdu.o
+│           │   │   │   ├── cg84lpmvn7y8066boozu2egmw.o
+│           │   │   │   ├── d5mqfevhx2549hsqo8fjkfl7d.o
+│           │   │   │   ├── d6fjs7rtvmmrw6wdz9em3qmlh.o
+│           │   │   │   ├── d6lmsjsdt3q8j9zdd7nmm8wjw.o
+│           │   │   │   ├── dep-graph.bin
+│           │   │   │   ├── dgmen06io0v3hvh9fe1e0o5n5.o
+│           │   │   │   ├── dgw8g5s2wcwly3jogi397lo9c.o
+│           │   │   │   ├── dp12i2j8ny04jt2cd0k0gbjff.o
+│           │   │   │   ├── e37k3cejr5wnvxgtem4366y0u.o
+│           │   │   │   ├── e37oe5yuuj7lbue1w5ibn3b7t.o
+│           │   │   │   ├── e3jw5jwmx4y1i63pvds5zegl1.o
+│           │   │   │   ├── e4zo0qpbc9qyoxdhuya3z06hz.o
+│           │   │   │   ├── egky9y3om3t4qlowiofyj59x4.o
+│           │   │   │   ├── eicukf8lut95pmo9p1970ab72.o
+│           │   │   │   ├── evwi1ltzy63cax0f5xey1yjpa.o
+│           │   │   │   ├── ew2uel7qs3fkwwzpo1chu1pvu.o
+│           │   │   │   ├── f1qhrhszhs22702h3k4mbbwyr.o
+│           │   │   │   ├── metadata.rmeta
+│           │   │   │   ├── query-cache.bin
+│           │   │   │   └── work-products.bin
+│           │   │   └── s-hmxxiu7u0s-1knazow.lock
+│           │   ├── forge_parser-15dqy07tdspdk
+│           │   │   ├── s-hmxxfgeobq-0pdj53n-5jn7tb0l4axfih6ncicg4uhjt
+│           │   │   │   ├── 0fgoxmkmlvtqu2h7j3rmwc2fe.o
+│           │   │   │   ├── 0lccleaqin0rs817sdsqcjneq.o
+│           │   │   │   ├── 3bpafa56di96h14q1ctdjt719.o
+│           │   │   │   ├── 53osxlo27260pe22umhkcniqw.o
+│           │   │   │   ├── 5ve0xzevoqzp7k9a5pze9341i.o
+│           │   │   │   ├── 940wuh0qtzwzjkqtprcm8kwr8.o
+│           │   │   │   ├── a1g8cbs1hu1fmx2tk6or0e95o.o
+│           │   │   │   ├── d7f0z5gykdr84vepw51ud95ch.o
+│           │   │   │   ├── dep-graph.bin
+│           │   │   │   ├── df0bvlcxlwnec04o5cdy39jtj.o
+│           │   │   │   ├── emjqbjhhklqo9xst66hpvs98l.o
+│           │   │   │   ├── metadata.rmeta
+│           │   │   │   ├── query-cache.bin
+│           │   │   │   └── work-products.bin
+│           │   │   └── s-hmxxfgeobq-0pdj53n.lock
+│           │   ├── forge_semantic-02s7jdab62hfa
+│           │   │   ├── s-hmxxfpm2gn-1s9xj2z-caitd7dyiyosm6o6w3kz48qwl
+│           │   │   │   ├── 01bmm3dnt16057vja3pj8xuq8.o
+│           │   │   │   ├── 0eqkro7f785h7ubjkhw4t6pz6.o
+│           │   │   │   ├── 0i8k4fctaemcncnk3vzgrvriq.o
+│           │   │   │   ├── 0yzsnll8fl1gavi7tzi85uzs2.o
+│           │   │   │   ├── 17mkiu0hcd2tl3h9e4qwpuz2u.o
+│           │   │   │   ├── 1u8qalvghwnu2zeron3ah6yyq.o
+│           │   │   │   ├── 2i1wplwvgd6gygh8l6p9ojecl.o
+│           │   │   │   ├── 3b118z1tu4kvgmpixov4b9d4s.o
+│           │   │   │   ├── 4bn3lhaf32n99twi6wi54v1l9.o
+│           │   │   │   ├── 5p98jf8hajy684r7svw8f9z7d.o
+│           │   │   │   ├── 5qtoby69igim4p695x6un4x6e.o
+│           │   │   │   ├── 5s2ypmanlcd11zp7uz66a3xfo.o
+│           │   │   │   ├── 5vcl6h6siuifnw5efqat1kr08.o
+│           │   │   │   ├── 7g85v62y44bjjhprlweb6slrx.o
+│           │   │   │   ├── 8bewj5ykiordk7807ifur014c.o
+│           │   │   │   ├── 8sl4fmpqp0yppwsnong1l1mhb.o
+│           │   │   │   ├── 9qbf2fys53qz9pyuaqfpew9b2.o
+│           │   │   │   ├── a39zola78550ycmiyr4rys5ba.o
+│           │   │   │   ├── a4epsrs2ubwsv2eqdhecyboqw.o
+│           │   │   │   ├── b1jyhr9sk5cyubc5pdptom81m.o
+│           │   │   │   ├── bep8rkh1ftt0h0udj03tgbsnj.o
+│           │   │   │   ├── c5gv38ml5rfnyfq89fnc5cl50.o
+│           │   │   │   ├── c7fvyy4n47qlf2i81vgf4psv1.o
+│           │   │   │   ├── cjqns2o017h23b8ww814ow0td.o
+│           │   │   │   ├── dep-graph.bin
+│           │   │   │   ├── e9o300p57f5lged4yq671ego4.o
+│           │   │   │   ├── ed3hqw5yv9ewa6onj665960rp.o
+│           │   │   │   ├── eir474gwdv5qhajylkh0597i2.o
+│           │   │   │   ├── enqqmqxzw5jn9x6uq1axpoeld.o
+│           │   │   │   ├── f0zkqq4b2r19rexec355pz7zr.o
+│           │   │   │   ├── metadata.rmeta
+│           │   │   │   ├── query-cache.bin
+│           │   │   │   └── work-products.bin
+│           │   │   └── s-hmxxfpm2gn-1s9xj2z.lock
+│           │   └── forge_semantic-1alvu1847uu52
+│           │       ├── s-hmxxervjm7-0tolt3p-4bklcgyk8fy6zlzbkg96zm3bc
+│           │       │   ├── 0ee6w1zyxck3rrumfpdo7lq5e.o
+│           │       │   ├── 0jxxt0eis2ng0vs75twyo61v7.o
+│           │       │   ├── 1rtmzvfmptm6oakn9hqw2wit9.o
+│           │       │   ├── 22eiqz78bhqbdxqfrhzk904t9.o
+│           │       │   ├── 2unsma7ghutlhbiqlyoic1n4y.o
+│           │       │   ├── 3jr812ddwgysta09bunwgyvyd.o
+│           │       │   ├── 3mp89rpmlyn3eh56shbokktyv.o
+│           │       │   ├── 41hnrttmsut7x0gy49oeingyk.o
+│           │       │   ├── 4plou3ocn3xd7v30kp4dfv663.o
+│           │       │   ├── 5bs1nqdvo9twe150mzqxe04cu.o
+│           │       │   ├── 5krl3d58skc01g46lrcofeeij.o
+│           │       │   ├── 5n3bcf5w6gheckb4booyof0q9.o
+│           │       │   ├── 7vyomzho6lp7i44yglclfogl4.o
+│           │       │   ├── 93jp892bzfciok28loy6r0pe0.o
+│           │       │   ├── 940pzqdc12695mtwvqby9b523.o
+│           │       │   ├── 9gjm8ifc7m4na8jnmbvubrtwn.o
+│           │       │   ├── 9zbc293u96sldn2mf5puy9may.o
+│           │       │   ├── a6xya4340i3itmpcqcy85at3a.o
+│           │       │   ├── a7syjvd7kv71ke5faiziasuva.o
+│           │       │   ├── b6ptmmlsxz8tsz19zwbf5ycvn.o
+│           │       │   ├── c2ltm1nx775sel2d3ldreq6w2.o
+│           │       │   ├── ctmryd8ivxpvtsl2n07rt2uzd.o
+│           │       │   ├── d9e3kol3tgaypw7m4qvc2g6xv.o
+│           │       │   ├── dep-graph.bin
+│           │       │   ├── dgj464kgv508zvd5rv33mqag2.o
+│           │       │   ├── diu35adq7m9txy2cuvnfa5o9q.o
+│           │       │   ├── dvdp5cr7m1ftonq0kgdlsisp4.o
+│           │       │   ├── dwwa8sb7xucqwsbqhvz84wdok.o
+│           │       │   ├── dxx6py9fp2ozofa1fttzva0qd.o
+│           │       │   ├── eu8lluyf92jr8pg8novzitfrp.o
+│           │       │   ├── metadata.rmeta
+│           │       │   ├── query-cache.bin
+│           │       │   └── work-products.bin
+│           │       └── s-hmxxervjm7-0tolt3p.lock
+│           ├── libforge_cfg.d
+│           ├── libforge_cfg.rlib
+│           ├── libforge_core.d
+│           ├── libforge_core.rlib
+│           ├── libforge_lint.d
+│           ├── libforge_lint.rlib
+│           ├── libforge_parser.d
+│           ├── libforge_parser.rlib
+│           ├── libforge_semantic.d
+│           └── libforge_semantic.rlib
+└── README.md
+
+74 directories, 1003 files

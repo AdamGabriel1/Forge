@@ -33,11 +33,26 @@ impl Rule for ExpensiveOperationInsideLoop {
     }
 }
 
-/// Percorre o corpo do loop, mas **não desce em loops aninhados** — eles
-/// serão tratados quando o `walk` externo visitar o nó do loop interno.
-/// Isso evita duplicar diagnósticos.
+/// Percorre o corpo do loop. Se encontrar um loop aninhado, verifica sua
+/// **expressão iterada** (que é reavaliada a cada iteração externa), mas
+/// **não desce no corpo** — isso é feito quando o `walk` externo visitar
+/// o próprio loop aninhado. Sem isso, `reversed(x)` no cabeçalho de um
+/// `for` interno nunca seria visto.
 fn check_body(node: Node, source: &str, out: &mut Vec<Diagnostic>) {
     if matches!(node.kind(), "for_statement" | "while_statement") {
+        match node.kind() {
+            "for_statement" => {
+                if let Some(right) = node.child_by_field_name("right") {
+                    check_body(right, source, out);
+                }
+            }
+            "while_statement" => {
+                if let Some(cond) = node.child_by_field_name("condition") {
+                    check_body(cond, source, out);
+                }
+            }
+            _ => {}
+        }
         return;
     }
 
@@ -174,7 +189,6 @@ for a in xs:
     for b in ys:
         print(sorted(b))
 ";
-        // Só o loop interno reporta.
         assert_eq!(lint(&ExpensiveOperationInsideLoop, src).len(), 1);
     }
 
@@ -224,8 +238,6 @@ for x in items:
 
     #[test]
     fn operacao_no_else_do_loop_nao_conta() {
-        // O `else` de um `for` só executa uma vez, depois do loop acabar.
-        // Como o `body` field não inclui o `else_clause`, já está correto.
         let src = "\
 for x in items:
     print(x)

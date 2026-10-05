@@ -2,15 +2,7 @@
 target/
 **/*.rs.bk
 
-# Lockfiles de binário (mantemos Cargo.lock de bin)
-# Se for workspace com binário, comente a linha abaixo:
-# Cargo.lock
-
 # IDE
 .idea/
 .vscode/
 *.swp
-
-# Scripts de teste locais
-forge/*.py
-forge/forge.toml

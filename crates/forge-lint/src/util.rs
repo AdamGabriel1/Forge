@@ -1,6 +1,9 @@
-use crate::Rule;
-use forge_core::{Config, Context, Diagnostic, Range};
+use forge_core::Range;
 use tree_sitter::Node;
+
+// ---------------------------------------------------------------------------
+// Range e traversal
+// ---------------------------------------------------------------------------
 
 pub(crate) fn range_of(node: Node) -> Range {
     let start = node.start_position();
@@ -13,6 +16,10 @@ pub(crate) fn range_of(node: Node) -> Range {
     }
 }
 
+/// Percorre a árvore em pré-ordem.
+///
+/// O lifetime `'a` amarra a closure à mesma árvore do nó raiz, permitindo
+/// armazenar `Node<'a>` em coleções que vivem além da chamada.
 pub(crate) fn walk<'a, F: FnMut(Node<'a>)>(node: Node<'a>, f: &mut F) {
     f(node);
     let mut cursor = node.walk();

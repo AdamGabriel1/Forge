@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use forge_core::{noqa, Config, Context, Diagnostic, Severity};
+use forge_core::{apply_edits, noqa, Config, Context, Diagnostic, Severity};
 use forge_lint::{default_registry, RuleRegistry};
 use forge_parser::{get_parser, parse_python_source};
 use serde::Serialize;
@@ -41,8 +41,16 @@ enum Commands {
         #[arg(long)]
         check: bool,
     },
-    /// Aplica correções automáticas (ainda não implementado)
-    Fix { path: PathBuf },
+    /// Aplica correções automáticas
+    Fix {
+        path: PathBuf,
+        /// Não escreve no disco, só mostra o que seria feito.
+        #[arg(long)]
+        dry_run: bool,
+        /// Sai com código 1 se houver correções pendentes. Útil em CI.
+        #[arg(long)]
+        check: bool,
+    },
     /// Explica uma regra (ou lista todas com --list)
     Explain {
         code: Option<String>,
@@ -73,7 +81,11 @@ fn main() {
             format,
         } => run_check(path, strict, format),
         Commands::Fmt { path: _, check: _ } => println!("Formatter ainda não implementado."),
-        Commands::Fix { path: _ } => println!("Autofix ainda não implementado."),
+        Commands::Fix {
+            path,
+            dry_run,
+            check,
+        } => run_fix(path, dry_run, check),
         Commands::Explain { code, list } => run_explain(code, list),
     }
 }
@@ -187,6 +199,93 @@ fn run_check(path: PathBuf, strict: bool, format: OutputFormat) {
 
     if has_error || (strict && has_warning) {
         process::exit(1);
+    }
+}
+
+fn run_fix(path: PathBuf, dry_run: bool, check: bool) {
+    let config = load_config(&path);
+    let registry = default_registry();
+    let mut parser = get_parser();
+
+    let mut total_edits = 0usize;
+    let mut files_changed = 0usize;
+
+    for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+        if !entry.path().extension().map_or(false, |ext| ext == "py") {
+            continue;
+        }
+        let filepath = entry.path();
+        let source = match fs::read_to_string(filepath) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Erro ao ler {}: {}", filepath.display(), e);
+                continue;
+            }
+        };
+        let tree = match parse_python_source(&mut parser, &source) {
+            Some(t) => t,
+            None => continue,
+        };
+        let ctx = Context {
+            source: &source,
+            filepath: filepath.to_str().unwrap_or("<unknown>"),
+            config: &config,
+        };
+
+        // Reúne todos os edits por regra, agrupando os diagnósticos que
+        // cada regra produziu.
+        let mut edits = Vec::new();
+        for rule in registry.all() {
+            if !config.lint.is_enabled(rule.code()) {
+                continue;
+            }
+            let diags = rule.check(tree.root_node(), &ctx);
+            if diags.is_empty() {
+                continue;
+            }
+            edits.extend(rule.fix(tree.root_node(), &ctx, &diags));
+        }
+
+        if edits.is_empty() {
+            continue;
+        }
+
+        let n_edits = edits.len();
+        total_edits += n_edits;
+        files_changed += 1;
+
+        if check {
+            println!(
+                "{}: {} correção(ões) disponível(is)",
+                ctx.filepath, n_edits
+            );
+            continue;
+        }
+
+        let novo = apply_edits(&source, edits);
+        if dry_run {
+            println!("--- {} (dry-run) ---", ctx.filepath);
+            println!("{}", novo);
+            continue;
+        }
+
+        if let Err(e) = fs::write(filepath, &novo) {
+            eprintln!("Erro ao escrever {}: {}", filepath.display(), e);
+            continue;
+        }
+        println!("{}: {} correção(ões) aplicada(s)", ctx.filepath, n_edits);
+    }
+
+    if check && files_changed > 0 {
+        process::exit(1);
+    }
+    if total_edits == 0 {
+        println!("Nada a corrigir.");
+    } else if !dry_run && !check {
+        println!(
+            "Resumo: {} correção(ões) em {} arquivo(s).",
+            total_edits, files_changed
+        );
     }
 }
 

@@ -1,4 +1,4 @@
-use forge_core::{Context, Diagnostic};
+use forge_core::{Context, Diagnostic, Edit};
 use tree_sitter::Node;
 
 pub mod rules;
@@ -16,6 +16,15 @@ pub trait Rule {
     fn description(&self) -> &str;
     fn fix_hint(&self) -> &str;
     fn check(&self, node: Node, ctx: &Context) -> Vec<Diagnostic>;
+
+    /// Produz edits para corrigir os diagnósticos que **esta própria regra**
+    /// gerou. Por padrão, nenhuma correção é oferecida.
+    ///
+    /// `diagnostics` contém apenas os diagnósticos produzidos por este
+    /// `Rule::check` na mesma árvore/contexto.
+    fn fix(&self, _node: Node, _ctx: &Context, _diagnostics: &[Diagnostic]) -> Vec<Edit> {
+        Vec::new()
+    }
 }
 
 pub struct RuleRegistry {

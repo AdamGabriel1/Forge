@@ -1,6 +1,6 @@
 use crate::util::{range_of, walk};
 use crate::Rule;
-use forge_core::{Context, Diagnostic, Severity};
+use forge_core::{Context, Diagnostic, Edit, Severity};
 use std::collections::HashSet;
 use tree_sitter::Node;
 
@@ -48,6 +48,96 @@ impl Rule for UnusedImport {
         }
         diagnostics
     }
+
+    /// Estratégia conservadora: só remove a linha inteira quando
+    /// **todos** os nomes daquela instrução de import estão sem uso e a
+    /// instrução é a única coisa na sua linha. Casos como
+    /// `from x import a, b` com só `a` sem uso precisariam reescrever a
+    /// lista de nomes — fica para quando tivermos edições parciais.
+    fn fix(&self, node: Node, ctx: &Context, _diagnostics: &[Diagnostic]) -> Vec<Edit> {
+        let source = ctx.source;
+        let bytes = source.as_bytes();
+
+        // Reúne (statement, nomes declarados) para cada import do arquivo.
+        let mut stmts: Vec<(Node, Vec<String>)> = Vec::new();
+        walk(node, &mut |n| match n.kind() {
+            "import_statement" => {
+                let mut list = Vec::new();
+                collect_import_statement(n, source, &mut list);
+                if !list.is_empty() {
+                    stmts.push((n, list.into_iter().map(|(_, name)| name).collect()));
+                }
+            }
+            "import_from_statement" => {
+                let mut list = Vec::new();
+                collect_import_from(n, source, &mut list);
+                if !list.is_empty() {
+                    stmts.push((n, list.into_iter().map(|(_, name)| name).collect()));
+                }
+            }
+            _ => {}
+        });
+
+        let mut used: HashSet<String> = HashSet::new();
+        collect_used(node, source, &mut used);
+
+        let mut edits = Vec::new();
+        for (stmt, names) in stmts {
+            // Todos os nomes sem uso?
+            if !names.iter().all(|n| !used.contains(n)) {
+                continue;
+            }
+            // A instrução está sozinha na linha?
+            if !is_only_statement_on_line(stmt, source) {
+                continue;
+            }
+
+            let start = stmt.start_byte();
+            let mut end = stmt.end_byte();
+
+            // Come também trailing whitespace + newline.
+            while end < bytes.len() && (bytes[end] == b' ' || bytes[end] == b'\t') {
+                end += 1;
+            }
+            if end < bytes.len() && bytes[end] == b'\n' {
+                end += 1;
+            } else if end + 1 < bytes.len() && bytes[end] == b'\r' && bytes[end + 1] == b'\n' {
+                end += 2;
+            }
+
+            edits.push(Edit::delete(start, end));
+        }
+
+        edits
+    }
+}
+
+/// `true` se o nó é a única coisa na sua linha (só whitespace antes e depois).
+/// Restrito a nós de uma única linha — não tentamos corrigir imports
+/// multi-linha por enquanto.
+fn is_only_statement_on_line(node: Node, source: &str) -> bool {
+    let start_row = node.start_position().row;
+    let end_row = node.end_position().row;
+    if start_row != end_row {
+        return false;
+    }
+
+    let bytes = source.as_bytes();
+    let start_byte = node.start_byte();
+    let end_byte = node.end_byte();
+
+    let mut line_start = start_byte;
+    while line_start > 0 && bytes[line_start - 1] != b'\n' {
+        line_start -= 1;
+    }
+
+    let mut line_end = end_byte;
+    while line_end < bytes.len() && bytes[line_end] != b'\n' {
+        line_end += 1;
+    }
+
+    source[line_start..start_byte].trim().is_empty()
+        && source[end_byte..line_end].trim().is_empty()
 }
 
 fn collect_import_statement<'a>(
@@ -220,5 +310,59 @@ def f():
     pass
 ";
         assert_eq!(lint(&UnusedImport, src).len(), 0);
+    }
+
+    // ---- fix ----
+
+    fn make_ctx<'a>(source: &'a str, config: &'a forge_core::Config) -> Context<'a> {
+        Context {
+            source,
+            filepath: "<test>",
+            config,
+        }
+    }
+
+    fn run_fix(source: &str) -> Vec<Edit> {
+        let mut parser = forge_parser::get_parser();
+        let tree = forge_parser::parse_python_source(&mut parser, source).unwrap();
+        let cfg = forge_core::Config::default();
+        let ctx = make_ctx(source, &cfg);
+        let diags = UnusedImport.check(tree.root_node(), &ctx);
+        UnusedImport.fix(tree.root_node(), &ctx, &diags)
+    }
+
+    #[test]
+    fn fix_remove_linha_de_import_simples() {
+        let src = "import os\nimport sys\nprint(sys.version)\n";
+        let edits = run_fix(src);
+        assert_eq!(edits.len(), 1);
+
+        let novo = forge_core::apply_edits(src, edits);
+        assert_eq!(novo, "import sys\nprint(sys.version)\n");
+    }
+
+    #[test]
+    fn fix_nao_remove_linha_com_import_misto() {
+        // `import os, sys` com só `os` sem uso não é reescrito.
+        let src = "import os, sys\nprint(sys.version)\n";
+        let edits = run_fix(src);
+        assert!(edits.is_empty());
+    }
+
+    #[test]
+    fn fix_nao_remove_linha_com_dois_statements() {
+        let src = "import os; import sys\nprint(sys.version)\n";
+        let edits = run_fix(src);
+        assert!(edits.is_empty());
+    }
+
+    #[test]
+    fn fix_remove_dois_imports_independentes() {
+        let src = "import os\nimport sys\nimport json\nprint(sys.version)\n";
+        let edits = run_fix(src);
+        assert_eq!(edits.len(), 2);
+
+        let novo = forge_core::apply_edits(src, edits);
+        assert_eq!(novo, "import sys\nprint(sys.version)\n");
     }
 }

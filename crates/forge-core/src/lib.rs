@@ -91,6 +91,52 @@ impl Diagnostic {
 }
 
 // ---------------------------------------------------------------------------
+// Edição (autofix)
+// ---------------------------------------------------------------------------
+
+/// Uma edição textual num arquivo. Os offsets são **byte offsets** na fonte
+/// original (UTF-8), como os que o tree-sitter expõe.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    pub start_byte: usize,
+    pub end_byte: usize,
+    pub replacement: String,
+}
+
+impl Edit {
+    pub fn delete(start_byte: usize, end_byte: usize) -> Self {
+        Self {
+            start_byte,
+            end_byte,
+            replacement: String::new(),
+        }
+    }
+
+    pub fn replace(start_byte: usize, end_byte: usize, replacement: impl Into<String>) -> Self {
+        Self {
+            start_byte,
+            end_byte,
+            replacement: replacement.into(),
+        }
+    }
+}
+
+/// Aplica uma lista de edits a um texto. Ordena do fim para o começo para
+/// que offsets anteriores permaneçam válidos.
+pub fn apply_edits(source: &str, mut edits: Vec<Edit>) -> String {
+    edits.sort_by_key(|e| std::cmp::Reverse(e.start_byte));
+    let mut out = source.to_string();
+    for e in edits {
+        debug_assert!(
+            out.is_char_boundary(e.start_byte) && out.is_char_boundary(e.end_byte),
+            "edit em offset fora de char boundary"
+        );
+        out.replace_range(e.start_byte..e.end_byte, &e.replacement);
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
 // Contexto
 // ---------------------------------------------------------------------------
 

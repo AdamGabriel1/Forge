@@ -1,12 +1,11 @@
-//! Formatter opinativo. Duas passadas:
+//! Formatter opinativo. Três passadas:
 //!
-//! 1. **Gaps**: reescreve espaçamento entre tokens na mesma linha.
-//! 2. **Indentação**: reescreve o whitespace inicial de cada
-//!    statement, normalizando para 4 espaços por nível de bloco.
+//! 1. **Gaps**: espaçamento entre tokens na mesma linha.
+//! 2. **Indentação**: bloco, normalizando para 4 espaços por nível.
+//! 3. **Continuations**: linhas dentro de `()`/`[]`/`{}` multi-linha,
+//!    normalizadas para `base + 4 * profundidade`.
 //!
-//! Preserva multilinha, strings e comentários byte-a-byte dentro de
-//! cada linha. Não toca continuations nem alinhamento interno de
-//! expressões multi-linha.
+//! Preserva multilinha de strings, comentários, e backslash continuations.
 
 use forge_core::{apply_edits, Edit};
 use forge_parser::{get_parser, parse_python_source};
@@ -27,11 +26,11 @@ impl std::fmt::Display for FormatError {
 
 impl std::error::Error for FormatError {}
 
-/// Formata o fonte. Se nada muda, retorna o mesmo texto.
 pub fn format_source(source: &str) -> Result<String, FormatError> {
-    let stage1 = format_gaps(source)?;
-    let stage2 = format_indentation(&stage1)?;
-    Ok(stage2)
+    let s1 = format_gaps(source)?;
+    let s2 = format_indentation(&s1)?;
+    let s3 = format_continuations(&s2)?;
+    Ok(s3)
 }
 
 // ---------------------------------------------------------------------------
@@ -107,19 +106,17 @@ fn parent_is(n: Node, kind: &str) -> bool {
 }
 
 fn desired_gap(prev: Node, next: Node) -> Option<String> {
-    // 1. `@` em decorator: colado ao nome.
+    // `@` em decorator.
     if prev.kind() == "@" && parent_is(prev, "decorator") {
         return Some(String::new());
     }
 
-    // 2. `.` em attribute: sem espaço dos dois lados.
+    // `.` em attribute.
     if (prev.kind() == "." || next.kind() == ".") && parent_is(prev, "attribute") {
         return Some(String::new());
     }
 
-    // 3. `(` de chamada, subscript ou parâmetros: sem espaço antes.
-    //    O nome do nó varia entre versões do tree-sitter-python —
-    //    cobrimos `argument_list`, `arguments`, `call` e `parameters`.
+    // `(` de chamada/params.
     if next.kind() == "(" {
         if let Some(p) = next.parent() {
             if matches!(
@@ -131,12 +128,12 @@ fn desired_gap(prev: Node, next: Node) -> Option<String> {
         }
     }
 
-    // 4. `[` de subscript: sem espaço antes.
+    // `[` de subscript.
     if next.kind() == "[" && parent_is(next, "subscript") {
         return Some(String::new());
     }
 
-    // 5. Abridores e fechadores: sem espaço nas bordas internas.
+    // Abridores e fechadores.
     if matches!(prev.kind(), "(" | "[" | "{") {
         return Some(String::new());
     }
@@ -144,8 +141,7 @@ fn desired_gap(prev: Node, next: Node) -> Option<String> {
         return Some(String::new());
     }
 
-    // 6. `:` no fim de cabeçalho de bloco (if, for, while, def, class,
-    //    try, except, else, finally): sem espaço antes.
+    // `:` no fim de cabeçalho de bloco.
     if next.kind() == ":" {
         if let Some(p) = next.parent() {
             if matches!(
@@ -166,10 +162,7 @@ fn desired_gap(prev: Node, next: Node) -> Option<String> {
         }
     }
 
-    // 7. `:` — contexto decide.
-    //    slice: sem espaço dos dois lados.
-    //    pair / typed_parameter / typed_default_parameter: espaço depois,
-    //    nenhum antes.
+    // `:` contextual.
     if prev.kind() == ":" || next.kind() == ":" {
         if parent_is(prev, "slice") || parent_is(next, "slice") {
             return Some(String::new());
@@ -189,7 +182,7 @@ fn desired_gap(prev: Node, next: Node) -> Option<String> {
         }
     }
 
-    // 8. Vírgula.
+    // Vírgula.
     if prev.kind() == "," {
         if matches!(next.kind(), ")" | "]" | "}") {
             return Some(String::new());
@@ -200,27 +193,25 @@ fn desired_gap(prev: Node, next: Node) -> Option<String> {
         return Some(String::new());
     }
 
-    // 9. Walrus `:=` — espaço dos dois lados.
+    // Walrus, arrow.
     if prev.kind() == ":=" || next.kind() == ":=" {
         return Some(" ".to_string());
     }
-
-    // 10. `->` em anotação de retorno — espaço dos dois lados.
     if prev.kind() == "->" || next.kind() == "->" {
         return Some(" ".to_string());
     }
 
-    // 11. Operador unário colado ao operando.
+    // Unário.
     if is_unary_op(prev) {
         return Some(String::new());
     }
 
-    // 12. Operador binário — espaço dos dois lados.
+    // Binário.
     if is_binary_op(prev) || is_binary_op(next) {
         return Some(" ".to_string());
     }
 
-    // 13. `=` e variantes.
+    // Assignment.
     if is_assign_like_op(prev) || is_assign_like_op(next) {
         return Some(" ".to_string());
     }
@@ -294,7 +285,7 @@ fn is_assign_like_op(n: Node) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Passo 2: indentação
+// Passo 2: indentação de blocos
 // ---------------------------------------------------------------------------
 
 fn format_indentation(source: &str) -> Result<String, FormatError> {
@@ -361,6 +352,202 @@ fn fix_stmt_indent(node: Node, depth: usize, source: &str, edits: &mut Vec<Edit>
     if current != desired {
         edits.push(Edit::replace(line_start, ws_end, desired));
     }
+}
+
+// ---------------------------------------------------------------------------
+// Passo 3: indentação de continuations
+// ---------------------------------------------------------------------------
+
+fn format_continuations(source: &str) -> Result<String, FormatError> {
+    let mut parser = get_parser();
+    let tree = parse_python_source(&mut parser, source).ok_or(FormatError::ParseFailed)?;
+
+    let mut edits = Vec::new();
+    walk_continuations(tree.root_node(), source, &mut edits);
+    Ok(apply_edits(source, edits))
+}
+
+fn walk_continuations(node: Node, source: &str, edits: &mut Vec<Edit>) {
+    if matches!(node.kind(), "module" | "block") {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if !child.is_named() || child.kind() == "comment" {
+                continue;
+            }
+            if is_compound(child) {
+                // Recurse to find nested blocks.
+                walk_continuations(child, source, edits);
+            } else {
+                fix_statement_continuations(child, source, edits);
+            }
+        }
+    } else {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.is_named() {
+                walk_continuations(child, source, edits);
+            }
+        }
+    }
+}
+
+fn is_compound(node: Node) -> bool {
+    matches!(
+        node.kind(),
+        "if_statement"
+            | "for_statement"
+            | "while_statement"
+            | "with_statement"
+            | "try_statement"
+            | "function_definition"
+            | "class_definition"
+            | "match_statement"
+            | "decorated_definition"
+    )
+}
+
+fn fix_statement_continuations(stmt: Node, source: &str, edits: &mut Vec<Edit>) {
+    let start_row = stmt.start_position().row;
+    let end_row = stmt.end_position().row;
+    if start_row == end_row {
+        return;
+    }
+
+    let bytes = source.as_bytes();
+    let stmt_start = stmt.start_byte();
+    let stmt_end = stmt.end_byte();
+
+    // Base indent = whitespace at start of statement's first line.
+    let mut line_start = stmt_start;
+    while line_start > 0 && bytes[line_start - 1] != b'\n' {
+        line_start -= 1;
+    }
+    let base_indent = stmt_start - line_start;
+
+    // Collect brackets in byte order.
+    let mut brackets: Vec<(usize, u8)> = Vec::new();
+    collect_brackets_in_order(stmt, &mut brackets);
+    brackets.sort_by_key(|(b, _)| *b);
+
+    // Collect string ranges to skip.
+    let mut strings: Vec<(usize, usize)> = Vec::new();
+    collect_strings(stmt, &mut strings);
+
+    // Find first newline after stmt_start.
+    let mut i = stmt_start;
+    while i < stmt_end && bytes[i] != b'\n' {
+        i += 1;
+    }
+    if i >= stmt_end {
+        return;
+    }
+    i += 1;
+
+    while i < stmt_end {
+        let mut line_end = i;
+        while line_end < stmt_end && bytes[line_end] != b'\n' {
+            line_end += 1;
+        }
+
+        // Skip if inside a string.
+        let mut ws_end = i;
+        while ws_end < line_end && (bytes[ws_end] == b' ' || bytes[ws_end] == b'\t') {
+            ws_end += 1;
+        }
+
+        if ws_end >= line_end {
+            // Blank line — clear whitespace.
+            if ws_end > i {
+                edits.push(Edit::replace(i, ws_end, ""));
+            }
+            i = if line_end < stmt_end {
+                line_end + 1
+            } else {
+                stmt_end
+            };
+            continue;
+        }
+
+        if is_inside_string(ws_end, &strings) {
+            i = if line_end < stmt_end {
+                line_end + 1
+            } else {
+                stmt_end
+            };
+            continue;
+        }
+
+        // Compute bracket depth at line start.
+        let mut depth: isize = 0;
+        for (bpos, bkind) in &brackets {
+            if *bpos >= i {
+                break;
+            }
+            match *bkind {
+                b'(' | b'[' | b'{' => depth += 1,
+                b')' | b']' | b'}' => depth -= 1,
+                _ => {}
+            }
+        }
+        // If depth is 0, this is a backslash continuation — skip.
+        if depth <= 0 {
+            i = if line_end < stmt_end {
+                line_end + 1
+            } else {
+                stmt_end
+            };
+            continue;
+        }
+
+        let first_content_byte = bytes[ws_end];
+        let mut effective_depth = depth as usize;
+        if matches!(first_content_byte, b')' | b']' | b'}') {
+            effective_depth = effective_depth.saturating_sub(1);
+        }
+
+        let desired_indent = base_indent + effective_depth * 4;
+        let current_indent = ws_end - i;
+        if current_indent != desired_indent {
+            edits.push(Edit::replace(i, ws_end, " ".repeat(desired_indent)));
+        }
+
+        i = if line_end < stmt_end {
+            line_end + 1
+        } else {
+            stmt_end
+        };
+    }
+}
+
+fn collect_brackets_in_order(node: Node, out: &mut Vec<(usize, u8)>) {
+    match node.kind() {
+        "(" | ")" | "[" | "]" | "{" | "}" => {
+            out.push((node.start_byte(), node.kind().as_bytes()[0]));
+            return;
+        }
+        _ => {}
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_brackets_in_order(child, out);
+    }
+}
+
+fn collect_strings(node: Node, out: &mut Vec<(usize, usize)>) {
+    if node.kind() == "string" {
+        out.push((node.start_byte(), node.end_byte()));
+        return;
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_strings(child, out);
+    }
+}
+
+fn is_inside_string(byte: usize, strings: &[(usize, usize)]) -> bool {
+    strings
+        .iter()
+        .any(|(start, end)| byte >= *start && byte < *end)
 }
 
 // ---------------------------------------------------------------------------
@@ -468,7 +655,7 @@ mod tests {
         assert_eq!(fmt("x=a|b\n"), "x = a | b\n");
     }
 
-    // ---- booleanos e comparações especiais ----
+    // ---- booleanos ----
 
     #[test]
     fn espaco_em_and() {
@@ -576,7 +763,7 @@ mod tests {
         assert_eq!(fmt("x .y\n"), "x.y\n");
     }
 
-    // ---- `:` em dict / anotação / slice / cabeçalho ----
+    // ---- `:` ----
 
     #[test]
     fn espaco_em_dict_colon() {
@@ -645,7 +832,7 @@ mod tests {
         );
     }
 
-    // ---- indentação ----
+    // ---- indentação de bloco ----
 
     #[test]
     fn reindenta_2_espacos_para_4() {
@@ -729,13 +916,76 @@ def f():
         assert_eq!(fmt(src), src);
     }
 
-    // ---- preservação de contexto ----
+    // ---- continuations (novo) ----
 
     #[test]
-    fn multilinha_preservado() {
-        let src = "x = (\n    1,\n    2,\n)\n";
+    fn continuation_corrige_indent_em_chamada() {
+        let src = "x = foo(\n        a,\n        b,\n)\n";
+        let esperado = "x = foo(\n    a,\n    b,\n)\n";
+        assert_eq!(fmt(src), esperado);
+    }
+
+    #[test]
+    fn continuation_ja_correta_nao_muda() {
+        let src = "x = foo(\n    a,\n    b,\n)\n";
         assert_eq!(fmt(src), src);
     }
+
+    #[test]
+    fn continuation_em_funcao() {
+        let src = "def f():\n    x = foo(\n            a,\n            b,\n    )\n";
+        let esperado = "def f():\n    x = foo(\n        a,\n        b,\n    )\n";
+        assert_eq!(fmt(src), esperado);
+    }
+
+    #[test]
+    fn continuation_aninhada() {
+        let src = "x = foo(\n        bar(\n                a,\n        ),\n)\n";
+        let esperado = "x = foo(\n    bar(\n        a,\n    ),\n)\n";
+        assert_eq!(fmt(src), esperado);
+    }
+
+    #[test]
+    fn continuation_com_lista() {
+        let src = "x = [\n        1,\n        2,\n]\n";
+        let esperado = "x = [\n    1,\n    2,\n]\n";
+        assert_eq!(fmt(src), esperado);
+    }
+
+    #[test]
+    fn continuation_com_dict() {
+        let src = "x = {\n        'a': 1,\n        'b': 2,\n}\n";
+        let esperado = "x = {\n    'a': 1,\n    'b': 2,\n}\n";
+        assert_eq!(fmt(src), esperado);
+    }
+
+    #[test]
+    fn continuation_fechador_alinhado() {
+        let src = "x = foo(\n    a,\n        )\n";
+        let esperado = "x = foo(\n    a,\n)\n";
+        assert_eq!(fmt(src), esperado);
+    }
+
+    #[test]
+    fn continuation_string_multilinha_preservada() {
+        let src = "x = \"\"\"\n    indented\n    string\n\"\"\"\n";
+        assert_eq!(fmt(src), src);
+    }
+
+    #[test]
+    fn continuation_backslash_preservada() {
+        let src = "x = 1 + \\\n    2\n";
+        assert_eq!(fmt(src), src);
+    }
+
+    #[test]
+    fn continuation_idempotente() {
+        let first = fmt("x = foo(\n        a,\n        b,\n)\n");
+        let second = fmt(&first);
+        assert_eq!(first, second);
+    }
+
+    // ---- preservação de contexto ----
 
     #[test]
     fn comentario_preservado() {
@@ -759,7 +1009,15 @@ def f():
         assert_eq!(fmt("f(**kwargs)\n"), "f(**kwargs)\n");
     }
 
-    // ---- idempotência ----
+    #[test]
+    fn def_star_args() {
+        assert_eq!(
+            fmt("def f(*args):\n    pass\n"),
+            "def f(*args):\n    pass\n"
+        );
+    }
+
+    // ---- idempotência geral ----
 
     #[test]
     fn idempotente_simples() {
@@ -769,21 +1027,21 @@ def f():
     }
 
     #[test]
-    fn idempotente_operadores() {
+    fn idempotente_com_operadores() {
         let first = fmt("x=a+b*c\n");
         let second = fmt(&first);
         assert_eq!(first, second);
     }
 
     #[test]
-    fn idempotente_unario() {
+    fn idempotente_com_unario() {
         let first = fmt("x=-a-b\n");
         let second = fmt(&first);
         assert_eq!(first, second);
     }
 
     #[test]
-    fn idempotente_parenteses() {
+    fn idempotente_com_parenteses() {
         let first = fmt("f( a , b )\n");
         let second = fmt(&first);
         assert_eq!(first, second);

@@ -1,6 +1,8 @@
+use crate::util::walk;
 use crate::Rule;
-use forge_core::{Context, Diagnostic, Severity};
-use forge_semantic::{BindingKind, ScopeKind, SemanticModel};
+use forge_cfg::dataflow::run_block;
+use forge_cfg::definite_assignment::{collect_locals, DefiniteAssignmentAnalysis};
+use forge_core::{Context, Diagnostic};
 use tree_sitter::Node;
 
 pub struct UsedBeforeAssignment;
@@ -13,56 +15,31 @@ impl Rule for UsedBeforeAssignment {
         "used_before_assignment"
     }
     fn description(&self) -> &str {
-        "Uma variável local é lida antes de qualquer atribuição — Python lança `UnboundLocalError`."
+        "Uma variável local é lida antes de ser atribuída em todos os caminhos — Python lança `UnboundLocalError` em runtime."
     }
     fn fix_hint(&self) -> &str {
-        "Mova a atribuição para antes do uso, ou atribua um valor inicial (`None`)."
+        "Mova a atribuição para antes do uso, ou atribua um valor inicial."
     }
 
     fn check(&self, node: Node, ctx: &Context) -> Vec<Diagnostic> {
-        let model = SemanticModel::analyze(node, ctx.source);
         let mut diagnostics = Vec::new();
 
-        for (name, use_range, use_scope, resolved_scope) in model.resolved_uses() {
-            // Só olhamos usos que resolvem no mesmo escopo onde ocorrem.
-            // Se resolvem em escopo ancestral (closure), Python captura
-            // de forma lazy — não é bug.
-            if use_scope != resolved_scope {
-                continue;
+        // Só analisamos corpos de função. Módulo tem semântica mais
+        // permissiva em Python (nomes são resolvidos em tempo de execução).
+        walk(node, &mut |n| {
+            if n.kind() != "function_definition" {
+                return;
             }
-
-            let scope = &model.scopes[resolved_scope];
-            // Só em escopos de função.
-            if scope.kind != ScopeKind::Function {
-                continue;
-            }
-
-            let Some(binding) = scope.bindings.get(name) else {
-                continue;
+            let Some(body) = n.child_by_field_name("body") else {
+                return;
             };
-
-            // Parâmetros existem desde o início da função.
-            if matches!(binding.kind, BindingKind::Parameter) {
-                continue;
+            let (locals, params) = collect_locals(n, ctx.source);
+            if locals.is_empty() && params.is_empty() {
+                return;
             }
-
-            // Comparamos posições lexicais. Se o uso está depois da
-            // primeira atribuição no arquivo, assumimos OK — não
-            // detectamos "atribuição só em um branch do if".
-            let use_pos = (use_range.start_line, use_range.start_col);
-            let bind_pos = (binding.range.start_line, binding.range.start_col);
-            if use_pos < bind_pos {
-                diagnostics.push(Diagnostic::new(
-                    "FOR012",
-                    &format!(
-                        "`{}` é usado antes de ser atribuído — `UnboundLocalError` em tempo de execução.",
-                        name
-                    ),
-                    use_range.clone(),
-                    Severity::Warning,
-                ));
-            }
-        }
+            let analysis = DefiniteAssignmentAnalysis::new(ctx.source, locals, params);
+            run_block(body, analysis.initial(), &analysis, &mut diagnostics);
+        });
 
         diagnostics
     }
@@ -72,6 +49,8 @@ impl Rule for UsedBeforeAssignment {
 mod tests {
     use super::*;
     use crate::util::test_util::lint;
+
+    // ---- casos básicos (v1 também cobria) ----
 
     #[test]
     fn uso_antes_de_atribuicao_local() {
@@ -104,22 +83,18 @@ def f(x):
 
     #[test]
     fn uso_em_closure_nao_reporta() {
-        // Python captura `x` de forma lazy — `inner` só vê `x`
-        // quando é chamado, e nessa altura `x` já existe.
         let src = "\
 def outer():
     def inner():
         return x
     x = 1
-    return inner()
+    return inner
 ";
         assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
     }
 
     #[test]
     fn uso_em_escopo_modulo_nao_reporta() {
-        // Módulo é top-level; ordem é a do arquivo, mas Python
-        // resolve nomes em tempo de execução — não é "assignment".
         let src = "\
 print(x)
 x = 1
@@ -147,5 +122,91 @@ def f():
     print(i)
 ";
         assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
+    }
+
+    // ---- casos novos: sensíveis a caminho ----
+
+    #[test]
+    fn if_sem_else_apenas_then_atribui_reporta() {
+        let src = "\
+def f(c):
+    if c:
+        x = 1
+    print(x)
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
+    }
+
+    #[test]
+    fn if_else_ambos_atribuem_ok() {
+        let src = "\
+def f(c):
+    if c:
+        x = 1
+    else:
+        x = 2
+    print(x)
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
+    }
+
+    #[test]
+    fn if_else_so_else_atribui_reporta() {
+        let src = "\
+def f(c):
+    if c:
+        pass
+    else:
+        x = 1
+    print(x)
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
+    }
+
+    #[test]
+    fn atribuicao_antes_do_if_ok() {
+        let src = "\
+def f(c):
+    x = 0
+    if c:
+        x = 1
+    print(x)
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
+    }
+
+    #[test]
+    fn uso_dentro_do_ramo_que_atribui_ok() {
+        let src = "\
+def f(c):
+    if c:
+        x = 1
+        print(x)
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
+    }
+
+    #[test]
+    fn uso_no_ramo_que_nao_atribui_reporta() {
+        let src = "\
+def f(c):
+    if c:
+        pass
+    else:
+        x = 1
+        print(x)
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
+    }
+
+    #[test]
+    fn reatribuicao_apos_uso_continua_reportando() {
+        let src = "\
+def f():
+    y = x
+    x = 1
+    return y
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
     }
 }

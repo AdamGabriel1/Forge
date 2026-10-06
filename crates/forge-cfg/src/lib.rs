@@ -4,6 +4,7 @@ use forge_core::Range;
 use tree_sitter::Node;
 
 pub mod dataflow;
+pub mod definite_assignment;
 pub mod nullable;
 
 /// `true` se o nó é uma instrução que encerra o fluxo linear do bloco.

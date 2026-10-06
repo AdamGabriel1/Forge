@@ -2,15 +2,19 @@
 
 [![CI](https://github.com/AdamGabriel1/Forge/actions/workflows/ci.yml/badge.svg)](https://github.com/AdamGabriel1/Forge/actions/workflows/ci.yml)
 
-Linter estático e (futuro) formatter para Python, escrito em Rust.
+Linter, formatter e ferramenta de adoção incremental para Python, escrito em
+Rust sobre [tree-sitter](https://tree-sitter.github.io/tree-sitter/).
 
-O Forge analisa código Python com [tree-sitter](https://tree-sitter.github.io/tree-sitter/)
-e reporta problemas de estilo, correção e possíveis bugs — sem executar o
-código. A arquitetura em crates separa parsing, análise semântica, fluxo de
-controle e regras, permitindo crescer cada camada de forma independente.
+O Forge combina três coisas que normalmente vivem em ferramentas separadas:
 
-> ⚠️ **Projeto em desenvolvimento.** O formatter (`forge fmt`) ainda não está
-> implementado. As 14 regras de lint e o autofix de 3 delas já funcionam.
+- **Lint** com 14 regras, incluindo análise de fluxo (nullable, definite
+  assignment) sensível a caminho de execução.
+- **Formatter** opinativo, idempotente, preservando strings e comentários.
+- **Baseline** para adoção incremental em projetos legados: você gera um
+  snapshot dos problemas existentes e passa a enxergar só o que é novo.
+
+> ⚠️ **Projeto em desenvolvimento.** O formatter cobre espaçamento e
+> indentação, mas ainda não quebra linhas longas nem reformata docstrings.
 
 ---
 
@@ -58,8 +62,34 @@ forge fix src/ --dry-run      # mostra o resultado sem escrever
 forge fix src/ --check        # sai com 1 se há correções pendentes (útil em CI)
 ```
 
-Regras com autofix hoje: **FOR001** (`except:` → `except Exception:`),
-**FOR006** (imports não usados), **FOR011** (código inalcançável).
+Regras com autofix hoje:
+
+| Regra  | Correção                                                        |
+|--------|-----------------------------------------------------------------|
+| FOR001 | `except:` → `except Exception:`                                 |
+| FOR002 | `def f(x=[])` → `def f(x=None): if x is None: x = []`           |
+| FOR006 | Remove imports não usados                                       |
+| FOR011 | Remove código inalcançável após `return`/`raise`/`break`/`continue` |
+
+### `forge fmt`
+
+Formata código Python. Idempotente, preserva strings e comentários.
+
+```bash
+forge fmt src/                # escreve no disco
+forge fmt src/ --check        # sai com 1 se algum arquivo precisa
+```
+
+Regras implementadas:
+
+- **Espaçamento**: vírgulas, operadores binários, `and`/`or`/`not`,
+  `is`/`in`, unários, `=` e `+=`, `:=`, `->`
+- **Delimitadores**: sem espaço dentro de `()`/`[]`/`{}`, sem espaço
+  antes de `.`/`(`/`[`, sem espaço antes de `:` de cabeçalho de bloco
+- **Colons contextuais**: `{1: 2}` (dict), `def f(x: int)` (anotação),
+  `a[1:2]` (slice sem espaço)
+- **Indentação**: normaliza para 4 espaços por nível de bloco
+- **Decoradores**: `@app.route` colado ao nome
 
 ### `forge baseline`
 
@@ -150,20 +180,46 @@ max-lines = 80
 
 ## Arquitetura
 
-Workspace Rust com 6 crates:
+Workspace Rust com 7 crates:
 
 ```
 crates/
 ├── forge-core       # Diagnostic, Severity, Range, Edit, Config, noqa, baseline
 ├── forge-parser     # wrapper sobre tree-sitter-python
 ├── forge-semantic   # escopos, bindings, uses, resolução de nomes
-├── forge-cfg        # terminadores de fluxo, detecção de código inalcançável
+├── forge-cfg        # data-flow engine: Analysis trait, Nullable, DefiniteAssignment
+├── forge-format     # formatter
 ├── forge-lint       # trait Rule, RuleRegistry, as 14 regras
-└── forge-cli        # binário `forge` (check, fix, baseline, explain)
+└── forge-cli        # binário `forge` (check, fix, fmt, baseline, explain)
 ```
 
-Cada regra implementa a trait `Rule` e é registrada em `default_registry()`.
-Adicionar uma regra nova é uma struct + uma linha de registro.
+### Motor de data-flow
+
+`forge-cfg` expõe um trait `Analysis` que permite implementar análises
+sensíveis a caminho sem materializar um CFG explícito:
+
+```rust
+pub trait Analysis {
+    type State: Clone + PartialEq;
+    fn initial(&self) -> Self::State;
+    fn transfer(&self, node: Node, state: &State, diags: &mut Vec<Diagnostic>) -> State;
+    fn refine(&self, cond: Node, state: &State, positive: bool) -> State;
+    fn merge(&self, a: &State, b: &State) -> State;
+}
+```
+
+Duas análises já implementadas:
+
+- **`NullableAnalysis`** — rastreia se uma variável pode ser `None` (FOR013).
+- **`DefiniteAssignmentAnalysis`** — rastreia se uma variável foi atribuída em
+  todos os caminhos até um ponto (FOR012).
+
+O walker recursivo faz merge em `if/else` e uma aproximação conservadora em
+loops. `if x is not None:` refina o estado do ramo positivo para `NotNone`.
+
+Esse modelo é suficiente para análises sensíveis a caminho como nullable e
+definite assignment. Quando quisermos `constant propagation` de verdade,
+migramos para um CFG materializado — o trait sobrevive.
 
 ---
 
@@ -173,30 +229,49 @@ Adicionar uma regra nova é uma struct + uma linha de registro.
 # Build
 cargo build
 
-# Testes (161 em forge-lint + 4 em forge-core)
-cargo test
+# Testes (251 no total)
+cargo test --all
 
 # Só um crate
 cargo test -p forge-lint
+cargo test -p forge-format
+cargo test -p forge-cfg
 
 # Ver o registry
 cargo run -- explain --list
 ```
 
-Antes de abrir PR, rode `cargo fmt` e `cargo clippy`.
+Antes de abrir PR: `cargo fmt --all` e
+`cargo clippy --all-targets --all-features -- -D warnings`. O CI roda
+exatamente esses comandos mais `cargo test --all`.
+
+---
+
+## Performance
+
+Medido em Codespaces (2 vCPU), 200 arquivos × 1100 linhas = 220k linhas:
+
+| Modo                  | Tempo  |
+|-----------------------|--------|
+| Serial (`RAYON_NUM_THREADS=1`) | ~4.4s  |
+| Paralelo (default)             | ~3.1s  |
+
+O `check`, `fix`, `baseline` e `fmt` rodam em paralelo por arquivo via
+`rayon`. Cada thread mantém seu próprio `tree-sitter::Parser` (não é
+`Sync`).
 
 ---
 
 ## Limitações conhecidas
 
-- **FOR013** é linear por escopo: não modela branches de `if`. Reporta
-  falsos positivos em `x = 5; if c: x = None; x.foo()` e falsos negativos
-  em `x = None; if c: x = 5; x.foo()`. Quando tivermos um CFG com merge de
-  estados, migramos a regra para data-flow real.
+- **FOR013** e **FOR012** aproximam loops sem ponto fixo: uma única passada
+  pelo corpo é o suficiente para os casos comuns, mas em casos raros com
+  invariantes complexas pode gerar falso positivo ou negativo.
 - **FOR014** só reconhece `sorted`, `reversed`, `.sort()` e comprehensions.
   Chamadas potencialmente caras a métodos customizados ficam de fora.
-- **`forge fmt`** ainda não existe. O subcomando está stubado.
-- **`forge fix`** cobre só 3 das 14 regras; as demais não oferecem autofix.
+- **`forge fmt`** não quebra linhas longas, não reformata docstrings, e não
+  toca a indentação de continuations dentro de parênteses/colchetes/chaves.
+- **`forge fix`** cobre 4 das 14 regras.
 
 ---
 

@@ -232,25 +232,17 @@ fn classify_value(node: Node, bytes: &[u8]) -> Nullable {
 ///
 /// Retorna `(nome, checks_for_none)`. Se `checks_for_none` é `true`, a
 /// condição pergunta se `x` é `None`.
-fn parse_none_check<'tree>(cond: Node<'tree>, bytes: &[u8]) -> Option<(&'tree str, bool)> {
-    // Estrutura em tree-sitter-python:
-    //   comparison_operator
-    //     ├── left: <expr>
-    //     ├── <op>   (is / is not / == / !=)
-    //     └── right: <expr>
-    //
-    // Mas `is not` pode vir como dois tokens (`is` e `not`).
-    // Iteramos os filhos diretos para ser robusto.
-
+fn parse_none_check<'tree>(
+    cond: Node<'tree>,
+    bytes: &'tree [u8],
+) -> Option<(&'tree str, bool)> {
     let mut cursor = cond.walk();
     let children: Vec<Node> = cond.children(&mut cursor).collect();
 
-    // Pega primeiro e último named.
     let first = children.iter().find(|c| c.is_named())?;
     let last = children.iter().rev().find(|c| c.is_named())?;
 
-    // Identifica qual lado é `None`.
-    let (id_node, op_start_idx) = if first.kind() == "none" {
+    let (id_node, _op_side) = if first.kind() == "none" {
         (last, 0)
     } else if last.kind() == "none" {
         (first, 1)
@@ -262,7 +254,6 @@ fn parse_none_check<'tree>(cond: Node<'tree>, bytes: &[u8]) -> Option<(&'tree st
         return None;
     }
 
-    // Reúne os tokens do operador.
     let mut op_parts: Vec<&str> = Vec::new();
     for child in &children {
         if child.is_named() {
@@ -282,10 +273,8 @@ fn parse_none_check<'tree>(cond: Node<'tree>, bytes: &[u8]) -> Option<(&'tree st
         return None;
     }
 
-    let _ = op_start_idx;
     let name = id_node.utf8_text(bytes).ok()?;
 
-    // `checks_for_none` é o oposto de `is_not`.
     Some((name, !is_not))
 }
 

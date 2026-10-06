@@ -80,6 +80,47 @@ impl<'src> NullableAnalysis<'src> {
     fn src(&self) -> &[u8] {
         self.source.as_bytes()
     }
+
+    /// Percorre uma sub-expressão procurando derefs (`x.foo`, `x[i]`)
+    /// que sejam suspeitos dado o `state`. **Não desce** em escopos
+    /// aninhados (`def`, `class`, `lambda`) — eles são tratados
+    /// separadamente pelo `check` da regra.
+    fn walk_expr<'tree>(
+        &self,
+        node: Node<'tree>,
+        state: &NullableState,
+        diags: &mut Vec<Diagnostic>,
+    ) {
+        let bytes = self.src();
+        match node.kind() {
+            "function_definition" | "class_definition" | "lambda" => {
+                // Escopos separados.
+            }
+            "attribute" => {
+                if let Some(obj) = node.child_by_field_name("object") {
+                    check_deref(obj, state, bytes, "atributo", diags);
+                    self.walk_expr(obj, state, diags);
+                }
+            }
+            "subscript" => {
+                if let Some(value) = node.child_by_field_name("value") {
+                    check_deref(value, state, bytes, "índice", diags);
+                    self.walk_expr(value, state, diags);
+                }
+                if let Some(idx) = node.child_by_field_name("subscript") {
+                    self.walk_expr(idx, state, diags);
+                }
+            }
+            _ => {
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    if child.is_named() {
+                        self.walk_expr(child, state, diags);
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl<'src> Analysis for NullableAnalysis<'src> {
@@ -100,35 +141,30 @@ impl<'src> Analysis for NullableAnalysis<'src> {
 
         match node.kind() {
             "assignment" => {
-                let Some(left) = node.child_by_field_name("left") else {
-                    return new;
-                };
-                if left.kind() != "identifier" {
-                    return new;
+                // RHS é avaliado primeiro em Python — derefs lá usam o
+                // estado de entrada.
+                if let Some(right) = node.child_by_field_name("right") {
+                    self.walk_expr(right, state, diags);
                 }
-                let Ok(name) = left.utf8_text(bytes) else {
-                    return new;
-                };
-                let value = match node.child_by_field_name("right") {
-                    Some(r) => classify_value(r, bytes),
-                    None => Nullable::Unknown,
-                };
-                new.set(name, value);
-            }
-
-            "attribute" => {
-                if let Some(obj) = node.child_by_field_name("object") {
-                    check_deref(obj, state, bytes, "atributo", diags);
-                }
-            }
-
-            "subscript" => {
-                if let Some(obj) = node.child_by_field_name("value") {
-                    check_deref(obj, state, bytes, "índice", diags);
+                if let Some(left) = node.child_by_field_name("left") {
+                    if left.kind() == "identifier" {
+                        if let Ok(name) = left.utf8_text(bytes) {
+                            let value = node
+                                .child_by_field_name("right")
+                                .map(|r| classify_value(r, bytes))
+                                .unwrap_or(Nullable::Unknown);
+                            new.set(name, value);
+                        }
+                    } else {
+                        // `x.y = 5` / `x[i] = 5` — LHS é uso.
+                        self.walk_expr(left, state, diags);
+                    }
                 }
             }
-
-            _ => {}
+            _ => {
+                // Qualquer outro nó: procura derefs nas sub-expressões.
+                self.walk_expr(node, state, diags);
+            }
         }
 
         new
@@ -144,12 +180,6 @@ impl<'src> Analysis for NullableAnalysis<'src> {
         let bytes = self.src();
 
         if let Some((name, checks_for_none)) = parse_none_check(cond, bytes) {
-            // `checks_for_none = true` → a condição pergunta "é None?"
-            //   então positive=true → DefinitelyNone
-            //        positive=false → NotNone
-            // `checks_for_none = false` → a condição pergunta "não é None?"
-            //   então positive=true → NotNone
-            //        positive=false → DefinitelyNone
             let target = if checks_for_none == positive {
                 Nullable::DefinitelyNone
             } else {
@@ -163,8 +193,6 @@ impl<'src> Analysis for NullableAnalysis<'src> {
 
     fn merge(&self, a: &Self::State, b: &Self::State) -> Self::State {
         let mut new = NullableState::new();
-        // União das chaves — se uma variável só aparece em um lado, o outro
-        // lado a vê como Unknown.
         let mut keys: Vec<&String> = a.map.keys().collect();
         for k in b.map.keys() {
             if !a.map.contains_key(k) {

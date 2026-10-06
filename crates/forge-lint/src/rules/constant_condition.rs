@@ -80,11 +80,28 @@ def f():
     }
 
     #[test]
-    fn if_var_reatribuida_nao_reporta() {
+    fn reatribuicao_sequencial_usa_ultimo_valor() {
+        // Sobrescrita direta: o segundo `=` sobrepõe o primeiro.
+        // No ponto do `if`, DEBUG é Bool(true) — reporta FOR015.
         let src = "\
 def f():
     DEBUG = False
     DEBUG = True
+    if DEBUG:
+        pass
+";
+        assert_eq!(lint(&ConstantCondition, src).len(), 1);
+    }
+
+    #[test]
+    fn reatribuicao_em_branch_nao_reporta() {
+        // Duas atribuições em caminhos diferentes → merge → NotConstant.
+        // Aqui sim testamos o comportamento de merge.
+        let src = "\
+def f(c):
+    DEBUG = False
+    if c:
+        DEBUG = True
     if DEBUG:
         pass
 ";

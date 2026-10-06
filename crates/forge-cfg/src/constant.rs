@@ -108,8 +108,7 @@ impl<'src> ConstantPropagation<'src> {
             "string" => {
                 if let Ok(text) = node.utf8_text(bytes) {
                     // Ignora prefixos comuns (r, b, u, f) e tira as quotes.
-                    let stripped = text
-                        .trim_start_matches(|c: char| c == 'r' || c == 'b' || c == 'u' || c == 'f');
+                    let stripped = text.trim_start_matches(['r', 'b', 'u', 'f']);
                     if stripped.len() >= 2 {
                         let inner = &stripped[1..stripped.len() - 1];
                         return ConstValue::Str(inner.to_string());
@@ -290,6 +289,10 @@ impl<'src> Analysis for ConstantPropagation<'src> {
         ConstState::new()
     }
 
+    /// O parâmetro `diags` não é emitido por esta análise em `transfer` —
+    /// diagnósticos saem em `observe_condition`. Ele existe apenas para
+    /// honrar a assinatura do trait e repassar em recursão.
+    #[allow(clippy::only_used_in_recursion)]
     fn transfer<'tree>(
         &self,
         node: Node<'tree>,

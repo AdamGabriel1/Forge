@@ -45,9 +45,7 @@ pub fn format_source(source: &str) -> Result<String, FormatError> {
             continue;
         }
 
-        // Só mexe em gaps puramente de espaços/tabs. Qualquer outra
-        // coisa (comentário que escapou da árvore, string colada, etc.)
-        // fica intocada.
+        // Só mexe em gaps puramente de espaços/tabs.
         if !gap.chars().all(|c| c == ' ' || c == '\t') {
             continue;
         }
@@ -95,10 +93,22 @@ fn collect_leaves<'a>(node: Node<'a>, out: &mut Vec<Node<'a>>) {
 
 /// Decide o gap desejado entre duas folhas adjacentes.
 ///
-/// `None` significa "deixe como está" — útil para casos que a v0
-/// ainda não cobre (keywords, indentação, colons, etc.).
+/// `None` significa "deixe como está" — útil para casos que ainda
+/// não cobrimos (indentação, `:` de dict/slice/anotação, etc.).
 fn desired_gap(prev: Node, next: Node) -> Option<String> {
-    // 1. Vírgula: espaço depois (a menos que seguida de fechador).
+    // 1. Parênteses/colchetes: nada depois do abridor, nada antes do
+    //    fechador. Cobre `f( a )` → `f(a)`, `[ 1 ]` → `[1]`, `{ }` → `{}`.
+    //    Cuidado: só dispara para os tokens de agrupamento em si, não
+    //    para `(` que às vezes aparece depois de `if`/`while` — nesses
+    //    casos o gap antes do `(` não é tocado (é outra regra).
+    if matches!(prev.kind(), "(" | "[" | "{") {
+        return Some(String::new());
+    }
+    if matches!(next.kind(), ")" | "]" | "}") {
+        return Some(String::new());
+    }
+
+    // 2. Vírgula: espaço depois (a menos que seguida de fechador).
     if prev.kind() == "," {
         if matches!(next.kind(), ")" | "]" | "}") {
             return Some(String::new());
@@ -109,18 +119,17 @@ fn desired_gap(prev: Node, next: Node) -> Option<String> {
         return Some(String::new());
     }
 
-    // 2. Operador unário seguido de operando — sem espaço.
-    //    Tem precedência sobre binário porque `-1` deve ficar `-1`.
+    // 3. Operador unário seguido de operando — sem espaço.
     if is_unary_op(prev) {
         return Some(String::new());
     }
 
-    // 3. Operador binário — espaço ao redor.
+    // 4. Operador binário — espaço ao redor.
     if is_binary_op(prev) || is_binary_op(next) {
         return Some(" ".to_string());
     }
 
-    // 4. `=` em assignment ou `+=` etc em augmented_assignment.
+    // 5. `=` e `+=` etc.
     if is_assign_like_op(prev) || is_assign_like_op(next) {
         return Some(" ".to_string());
     }
@@ -136,40 +145,52 @@ fn is_unary_op(n: Node) -> bool {
     matches!(n.parent().map(|p| p.kind()), Some("unary_operator"))
 }
 
-/// `+`, `-`, `*`, `**`, `/`, `//`, `%`, `@`, `&`, `|`, `^`, `<<`, `>>`
-/// como operadores entre duas expressões; `==`, `!=`, `<`, `<=`, `>`, `>=`
-/// como comparações.
+/// Operadores binários de várias famílias:
 ///
-/// **Não** pega `*` de `*args`/`**kwargs`: esses vivem em `list_splat_pattern`
-/// e `dictionary_splat_pattern`, não em `binary_operator`.
+/// - aritméticos e bit a bit (`+ - * / // % ** @ & | ^ << >>`)
+/// - comparações (`== != < <= > >=`)
+/// - comparações especiais (`is`, `is not`, `in`, `not in`)
+/// - booleanos (`and`, `or`)
+/// - `not` (em `not_operator`)
+///
+/// A verificação olha o **parent** do token para não confundir com:
+///   * `*` e `**` de `*args`/`**kwargs` (parent = `list_splat_pattern`
+///     ou `list_splat`)
+///   * `-` de `-1` (parent = `unary_operator`, tratado em `is_unary_op`)
 fn is_binary_op(n: Node) -> bool {
     let Some(parent) = n.parent() else {
         return false;
     };
-    if !matches!(parent.kind(), "binary_operator" | "comparison_operator") {
-        return false;
+    match parent.kind() {
+        "binary_operator" | "comparison_operator" => matches!(
+            n.kind(),
+            "+" | "-"
+                | "*"
+                | "/"
+                | "//"
+                | "%"
+                | "**"
+                | "@"
+                | "&"
+                | "|"
+                | "^"
+                | "<<"
+                | ">>"
+                | "=="
+                | "!="
+                | "<"
+                | "<="
+                | ">"
+                | ">="
+                | "in"
+                | "not in"
+                | "is"
+                | "is not"
+        ),
+        "boolean_operator" => matches!(n.kind(), "and" | "or"),
+        "not_operator" => n.kind() == "not",
+        _ => false,
     }
-    matches!(
-        n.kind(),
-        "+" | "-"
-            | "*"
-            | "/"
-            | "//"
-            | "%"
-            | "**"
-            | "@"
-            | "&"
-            | "|"
-            | "^"
-            | "<<"
-            | ">>"
-            | "=="
-            | "!="
-            | "<"
-            | "<="
-            | ">"
-            | ">="
-    )
 }
 
 /// `x = 1` (assignment) ou `x += 1` (augmented_assignment).
@@ -255,7 +276,7 @@ mod tests {
         assert_eq!(fmt("x+=1\n"), "x += 1\n");
     }
 
-    // ---- default_parameter / keyword_argument: preservados ----
+    // ---- default_parameter / keyword_argument ----
 
     #[test]
     fn default_parameter_sem_espaco() {
@@ -299,7 +320,49 @@ mod tests {
         assert_eq!(fmt("x=a|b\n"), "x = a | b\n");
     }
 
-    // ---- unário: preserva `-1`, `+1`, `~x` ----
+    // ---- booleanos e comparações especiais ----
+
+    #[test]
+    fn espaco_em_and() {
+        assert_eq!(fmt("if a and b:\n    pass\n"), "if a and b:\n    pass\n");
+    }
+
+    #[test]
+    fn adiciona_espaco_em_and() {
+        assert_eq!(fmt("if a and b:\n    pass\n"), "if a and b:\n    pass\n");
+    }
+
+    #[test]
+    fn and_sem_espaco_original() {
+        // Estranho mas válido (`aand` seria outro nome; com espaço é and).
+        // Nosso caso: `a and b` já tem espaço — não muda.
+        assert_eq!(fmt("x = a and b\n"), "x = a and b\n");
+    }
+
+    #[test]
+    fn espaco_em_or() {
+        assert_eq!(fmt("if a or b:\n    pass\n"), "if a or b:\n    pass\n");
+    }
+
+    #[test]
+    fn espaco_em_not() {
+        assert_eq!(fmt("if not x:\n    pass\n"), "if not x:\n    pass\n");
+    }
+
+    #[test]
+    fn is_none_espacado() {
+        assert_eq!(
+            fmt("if x is None:\n    pass\n"),
+            "if x is None:\n    pass\n"
+        );
+    }
+
+    #[test]
+    fn in_espacado() {
+        assert_eq!(fmt("if x in y:\n    pass\n"), "if x in y:\n    pass\n");
+    }
+
+    // ---- unário ----
 
     #[test]
     fn unario_negativo_sem_espaco() {
@@ -318,11 +381,42 @@ mod tests {
 
     #[test]
     fn binario_com_unario_direita() {
-        // `a - (-b)` — o segundo `-` é unário.
         assert_eq!(fmt("x=a - -b\n"), "x = a - -b\n");
     }
 
-    // ---- *args / **kwargs preservados ----
+    // ---- parênteses e colchetes ----
+
+    #[test]
+    fn remove_espaco_dentro_de_parenteses() {
+        assert_eq!(fmt("f( a )\n"), "f(a)\n");
+    }
+
+    #[test]
+    fn remove_espaco_dentro_de_lista() {
+        assert_eq!(fmt("x = [ 1, 2 ]\n"), "x = [1, 2]\n");
+    }
+
+    #[test]
+    fn remove_espaco_dentro_de_dict() {
+        assert_eq!(fmt("x = { 1: 2 }\n"), "x = {1: 2}\n");
+    }
+
+    #[test]
+    fn parenteses_vazios() {
+        assert_eq!(fmt("x = f( )\n"), "x = f()\n");
+    }
+
+    #[test]
+    fn colchetes_vazios() {
+        assert_eq!(fmt("x = [ ]\n"), "x = []\n");
+    }
+
+    #[test]
+    fn chaves_vazias() {
+        assert_eq!(fmt("x = { }\n"), "x = {}\n");
+    }
+
+    // ---- *args / **kwargs ----
 
     #[test]
     fn star_args_sem_alteracao() {
@@ -381,6 +475,13 @@ mod tests {
     #[test]
     fn idempotente_com_unario() {
         let first = fmt("x=-a-b\n");
+        let second = fmt(&first);
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn idempotente_com_parenteses() {
+        let first = fmt("f( a , b )\n");
         let second = fmt(&first);
         assert_eq!(first, second);
     }

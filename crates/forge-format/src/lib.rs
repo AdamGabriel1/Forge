@@ -45,7 +45,13 @@ pub fn format_source(source: &str) -> Result<String, FormatError> {
             continue;
         }
 
-        // Não toca em gaps que envolvam comentários ou strings.
+        // Só mexe em gaps puramente de espaços/tabs. Qualquer outra
+        // coisa (comentário que escapou da árvore, string colada, etc.)
+        // fica intocada.
+        if !gap.chars().all(|c| c == ' ' || c == '\t') {
+            continue;
+        }
+
         if is_comment(prev) || is_comment(next) || in_string(prev) || in_string(next) {
             continue;
         }
@@ -75,8 +81,7 @@ fn in_string(n: Node) -> bool {
     false
 }
 
-/// Coleta as folhas da árvore em ordem de byte (pré-ordem já é ordem
-/// de byte no tree-sitter).
+/// Coleta as folhas da árvore em ordem de byte.
 fn collect_leaves<'a>(node: Node<'a>, out: &mut Vec<Node<'a>>) {
     if node.child_count() == 0 {
         out.push(node);
@@ -91,7 +96,7 @@ fn collect_leaves<'a>(node: Node<'a>, out: &mut Vec<Node<'a>>) {
 /// Decide o gap desejado entre duas folhas adjacentes.
 ///
 /// `None` significa "deixe como está" — útil para casos que a v0
-/// ainda não cobre (operadores, keywords, indentação).
+/// ainda não cobre (keywords, indentação, colons, etc.).
 fn desired_gap(prev: Node, next: Node) -> Option<String> {
     // 1. Vírgula: espaço depois (a menos que seguida de fechador).
     if prev.kind() == "," {
@@ -104,23 +109,93 @@ fn desired_gap(prev: Node, next: Node) -> Option<String> {
         return Some(String::new());
     }
 
-    // 2. `=` em assignment: espaço de cada lado.
-    //    `def f(x=1)` e `g(x=1)` (default_parameter / keyword_argument)
-    //    NÃO são tocados.
-    if is_assignment_eq(prev) || is_assignment_eq(next) {
+    // 2. Operador unário seguido de operando — sem espaço.
+    //    Tem precedência sobre binário porque `-1` deve ficar `-1`.
+    if is_unary_op(prev) {
+        return Some(String::new());
+    }
+
+    // 3. Operador binário — espaço ao redor.
+    if is_binary_op(prev) || is_binary_op(next) {
+        return Some(" ".to_string());
+    }
+
+    // 4. `=` em assignment ou `+=` etc em augmented_assignment.
+    if is_assign_like_op(prev) || is_assign_like_op(next) {
         return Some(" ".to_string());
     }
 
     None
 }
 
-fn is_assignment_eq(n: Node) -> bool {
-    if n.kind() != "=" {
+/// `x = -1` — o `-` aqui é unário. `x = a - b` — binário.
+fn is_unary_op(n: Node) -> bool {
+    if !matches!(n.kind(), "-" | "+" | "~") {
         return false;
     }
-    n.parent()
-        .map(|p| p.kind() == "assignment")
-        .unwrap_or(false)
+    matches!(n.parent().map(|p| p.kind()), Some("unary_operator"))
+}
+
+/// `+`, `-`, `*`, `**`, `/`, `//`, `%`, `@`, `&`, `|`, `^`, `<<`, `>>`
+/// como operadores entre duas expressões; `==`, `!=`, `<`, `<=`, `>`, `>=`
+/// como comparações.
+///
+/// **Não** pega `*` de `*args`/`**kwargs`: esses vivem em `list_splat_pattern`
+/// e `dictionary_splat_pattern`, não em `binary_operator`.
+fn is_binary_op(n: Node) -> bool {
+    let Some(parent) = n.parent() else {
+        return false;
+    };
+    if !matches!(parent.kind(), "binary_operator" | "comparison_operator") {
+        return false;
+    }
+    matches!(
+        n.kind(),
+        "+" | "-"
+            | "*"
+            | "/"
+            | "//"
+            | "%"
+            | "**"
+            | "@"
+            | "&"
+            | "|"
+            | "^"
+            | "<<"
+            | ">>"
+            | "=="
+            | "!="
+            | "<"
+            | "<="
+            | ">"
+            | ">="
+    )
+}
+
+/// `x = 1` (assignment) ou `x += 1` (augmented_assignment).
+fn is_assign_like_op(n: Node) -> bool {
+    let Some(parent) = n.parent() else {
+        return false;
+    };
+    match parent.kind() {
+        "assignment" => n.kind() == "=",
+        "augmented_assignment" => matches!(
+            n.kind(),
+            "+=" | "-="
+                | "*="
+                | "/="
+                | "//="
+                | "%="
+                | "**="
+                | "&="
+                | "|="
+                | "^="
+                | ">>="
+                | "<<="
+                | "@="
+        ),
+        _ => false,
+    }
 }
 
 #[cfg(test)]
@@ -131,15 +206,7 @@ mod tests {
         format_source(s).expect("parse falhou")
     }
 
-    #[test]
-    fn adiciona_espaco_em_igual() {
-        assert_eq!(fmt("x=1\n"), "x = 1\n");
-    }
-
-    #[test]
-    fn preserva_igual_ja_espacado() {
-        assert_eq!(fmt("x = 1\n"), "x = 1\n");
-    }
+    // ---- vírgulas ----
 
     #[test]
     fn adiciona_espaco_apos_virgula() {
@@ -152,8 +219,46 @@ mod tests {
     }
 
     #[test]
+    fn lista_de_argumentos() {
+        assert_eq!(fmt("f(a,b,c)\n"), "f(a, b, c)\n");
+    }
+
+    #[test]
+    fn tupla_em_assignment() {
+        assert_eq!(fmt("a,b = 1,2\n"), "a, b = 1, 2\n");
+    }
+
+    // ---- assignment ----
+
+    #[test]
+    fn adiciona_espaco_em_igual() {
+        assert_eq!(fmt("x=1\n"), "x = 1\n");
+    }
+
+    #[test]
+    fn preserva_igual_ja_espacado() {
+        assert_eq!(fmt("x = 1\n"), "x = 1\n");
+    }
+
+    #[test]
+    fn normaliza_multiplos_espacos() {
+        assert_eq!(fmt("x   =   1\n"), "x = 1\n");
+    }
+
+    #[test]
+    fn multiplas_atribuicoes() {
+        assert_eq!(fmt("x=1\ny=2\nz=3\n"), "x = 1\ny = 2\nz = 3\n");
+    }
+
+    #[test]
+    fn augmented_assignment() {
+        assert_eq!(fmt("x+=1\n"), "x += 1\n");
+    }
+
+    // ---- default_parameter / keyword_argument: preservados ----
+
+    #[test]
     fn default_parameter_sem_espaco() {
-        // `def f(x=1)` não é assignment, então não é tocado.
         assert_eq!(fmt("def f(x=1):\n    pass\n"), "def f(x=1):\n    pass\n");
     }
 
@@ -161,6 +266,83 @@ mod tests {
     fn keyword_argument_sem_espaco() {
         assert_eq!(fmt("g(x=1)\n"), "g(x=1)\n");
     }
+
+    // ---- operadores binários ----
+
+    #[test]
+    fn espaco_em_soma() {
+        assert_eq!(fmt("x=a+b\n"), "x = a + b\n");
+    }
+
+    #[test]
+    fn espaco_em_multiplicacao() {
+        assert_eq!(fmt("x=a*b\n"), "x = a * b\n");
+    }
+
+    #[test]
+    fn espaco_em_comparacao() {
+        assert_eq!(fmt("x=a==b\n"), "x = a == b\n");
+    }
+
+    #[test]
+    fn espaco_em_menor_igual() {
+        assert_eq!(fmt("x=a<=b\n"), "x = a <= b\n");
+    }
+
+    #[test]
+    fn espaco_em_power() {
+        assert_eq!(fmt("x=a**b\n"), "x = a ** b\n");
+    }
+
+    #[test]
+    fn espaco_em_pipe() {
+        assert_eq!(fmt("x=a|b\n"), "x = a | b\n");
+    }
+
+    // ---- unário: preserva `-1`, `+1`, `~x` ----
+
+    #[test]
+    fn unario_negativo_sem_espaco() {
+        assert_eq!(fmt("x=-1\n"), "x = -1\n");
+    }
+
+    #[test]
+    fn unario_positivo_sem_espaco() {
+        assert_eq!(fmt("x=+1\n"), "x = +1\n");
+    }
+
+    #[test]
+    fn unario_bit_not_sem_espaco() {
+        assert_eq!(fmt("x=~y\n"), "x = ~y\n");
+    }
+
+    #[test]
+    fn binario_com_unario_direita() {
+        // `a - (-b)` — o segundo `-` é unário.
+        assert_eq!(fmt("x=a - -b\n"), "x = a - -b\n");
+    }
+
+    // ---- *args / **kwargs preservados ----
+
+    #[test]
+    fn star_args_sem_alteracao() {
+        assert_eq!(fmt("f(*args)\n"), "f(*args)\n");
+    }
+
+    #[test]
+    fn double_star_kwargs_sem_alteracao() {
+        assert_eq!(fmt("f(**kwargs)\n"), "f(**kwargs)\n");
+    }
+
+    #[test]
+    fn def_star_args() {
+        assert_eq!(
+            fmt("def f(*args):\n    pass\n"),
+            "def f(*args):\n    pass\n"
+        );
+    }
+
+    // ---- preservação de contexto ----
 
     #[test]
     fn multilinha_preservado() {
@@ -180,26 +362,25 @@ mod tests {
         assert_eq!(fmt(src), "s = \"a,b\"\n");
     }
 
-    #[test]
-    fn multiplas_atribuicoes() {
-        let src = "x=1\ny=2\nz=3\n";
-        assert_eq!(fmt(src), "x = 1\ny = 2\nz = 3\n");
-    }
+    // ---- idempotência ----
 
     #[test]
-    fn tupla_em_assignment() {
-        let src = "a,b = 1,2\n";
-        assert_eq!(fmt(src), "a, b = 1, 2\n");
-    }
-
-    #[test]
-    fn lista_de_argumentos() {
-        assert_eq!(fmt("f(a,b,c)\n"), "f(a, b, c)\n");
-    }
-
-    #[test]
-    fn idempotente() {
+    fn idempotente_simples() {
         let first = fmt("x=1\nf(a,b)\n");
+        let second = fmt(&first);
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn idempotente_com_operadores() {
+        let first = fmt("x=a+b*c\n");
+        let second = fmt(&first);
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn idempotente_com_unario() {
+        let first = fmt("x=-a-b\n");
         let second = fmt(&first);
         assert_eq!(first, second);
     }

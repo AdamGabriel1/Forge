@@ -545,9 +545,13 @@ fn collect_strings(node: Node, out: &mut Vec<(usize, usize)>) {
 }
 
 fn is_inside_string(byte: usize, strings: &[(usize, usize)]) -> bool {
+    // Considera "dentro" apenas se o byte está estritamente entre start e
+    // end. O primeiro byte de uma string **não** conta como dentro —
+    // se a linha começa exatamente com o primeiro char de uma string
+    // (ex: `    'a': 1,`), ela deve ser reformatada normalmente.
     strings
         .iter()
-        .any(|(start, end)| byte >= *start && byte < *end)
+        .any(|(start, end)| byte > *start && byte < *end)
 }
 
 // ---------------------------------------------------------------------------

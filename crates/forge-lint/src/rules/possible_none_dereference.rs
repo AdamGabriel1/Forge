@@ -1,7 +1,8 @@
 use crate::util::walk;
+use crate::Context;
 use crate::Rule;
 use forge_cfg::{run_block, Analysis, NullableAnalysis};
-use forge_core::{Context, Diagnostic};
+use forge_core::Diagnostic;
 use tree_sitter::Node;
 
 pub struct PossibleNoneDereference;
@@ -24,10 +25,8 @@ impl Rule for PossibleNoneDereference {
         let analysis = NullableAnalysis::new(ctx.source);
         let mut diagnostics = Vec::new();
 
-        // Top-level: variáveis de módulo.
         run_block(node, analysis.initial(), &analysis, &mut diagnostics);
 
-        // Cada função tem seu próprio escopo.
         walk(node, &mut |n| {
             if n.kind() != "function_definition" {
                 return;
@@ -218,7 +217,6 @@ def f():
 
     #[test]
     fn loop_simples_nao_reporta() {
-        // `for x in items` — x é Unknown, não dispara.
         let src = "\
 def f(items):
     for x in items:

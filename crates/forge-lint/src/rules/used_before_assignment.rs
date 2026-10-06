@@ -1,7 +1,8 @@
 use crate::util::walk;
+use crate::Context;
 use crate::Rule;
 use forge_cfg::{collect_locals, run_block, Analysis, DefiniteAssignmentAnalysis};
-use forge_core::{Context, Diagnostic};
+use forge_core::Diagnostic;
 use tree_sitter::Node;
 
 pub struct UsedBeforeAssignment;
@@ -23,8 +24,6 @@ impl Rule for UsedBeforeAssignment {
     fn check(&self, node: Node, ctx: &Context) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
 
-        // Só analisamos corpos de função. Módulo tem semântica mais
-        // permissiva em Python (nomes são resolvidos em tempo de execução).
         walk(node, &mut |n| {
             if n.kind() != "function_definition" {
                 return;
@@ -48,8 +47,6 @@ impl Rule for UsedBeforeAssignment {
 mod tests {
     use super::*;
     use crate::util::test_util::lint;
-
-    // ---- casos básicos ----
 
     #[test]
     fn uso_antes_de_atribuicao_local() {
@@ -122,8 +119,6 @@ def f():
 ";
         assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
     }
-
-    // ---- sensíveis a caminho ----
 
     #[test]
     fn if_sem_else_apenas_then_atribui_reporta() {
@@ -223,7 +218,6 @@ def f(items):
 
     #[test]
     fn uso_de_target_apos_for_reporta() {
-        // Se items for vazio, `i` não existe depois do loop.
         let src = "\
 def f(items):
     for i in items:

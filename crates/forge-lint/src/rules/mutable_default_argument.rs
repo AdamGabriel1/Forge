@@ -47,14 +47,16 @@ impl Rule for MutableDefaultArgument {
 
     /// Aplica dois edits por ocorrência:
     ///
-    /// 1. Substitui o literal mutável (`[]`, `{}`, `set()`) por `None`.
-    /// 2. Insere `if <name> is None: <name> = <literal>` no início do
-    ///    corpo da função.
+    /// 1. Substitui o literal mutável (`[]`, `{}`, `set()`, `list()`,
+    ///    `dict()`) por `None` na assinatura.
+    /// 2. Insere `if <name> is None: <name> = <literal>` **no início da
+    ///    linha** do primeiro statement do corpo. O indent é detectado a
+    ///    partir dessa linha, então funciona em funções de módulo (4) e
+    ///    em métodos (8).
     ///
-    /// A inserção no corpo acontece **uma vez por parâmetro corrigido**,
-    /// empilhando as guardas na mesma linha da primeira instrução. Não
-    /// reformatamos indentação — isso é papel do formatter; aqui só
-    /// garantimos que o código roda igual.
+    /// A inserção no corpo acontece uma vez por parâmetro corrigido,
+    /// empilhando as guardas na ordem da assinatura. Não reformatamos
+    /// indentação — isso é papel do formatter.
     fn fix(&self, node: Node, ctx: &Context, _diagnostics: &[Diagnostic]) -> Vec<Edit> {
         let bytes = ctx.source.as_bytes();
         let mut edits: Vec<Edit> = Vec::new();
@@ -71,7 +73,7 @@ impl Rule for MutableDefaultArgument {
             };
 
             // Coleta todos os parâmetros default mutáveis desta função.
-            let mut fixes: Vec<(String, String)> = Vec::new(); // (nome, literal)
+            let mut fixes: Vec<(String, String)> = Vec::new();
             let mut cursor = params.walk();
             for p in params.children(&mut cursor) {
                 if !matches!(p.kind(), "default_parameter" | "typed_default_parameter") {
@@ -118,42 +120,52 @@ impl Rule for MutableDefaultArgument {
                 ));
             }
 
-            // 2. Empilha guardas no início do corpo.
-            let body_start = body.start_byte();
-            let indent = detect_body_indent(body, ctx.source);
+            // 2. Descobre início da linha do primeiro statement do corpo e
+            //    o indent que essa linha usa.
+            let line_start = first_body_line_start(body, bytes);
+            let indent = detect_indent_at(line_start, bytes);
+
             let mut inserted = String::new();
             for (name, literal) in &fixes {
                 inserted.push_str(&format!(
                     "{indent}if {name} is None:\n{indent}    {name} = {literal}\n",
                 ));
             }
-            edits.push(Edit::replace(body_start, body_start, inserted));
+            edits.push(Edit::replace(line_start, line_start, inserted));
         });
 
         edits
     }
 }
 
-/// Detecta a indentação usada pela primeira instrução do corpo.
-/// Se o `block` estiver vazio, usa 4 espaços.
-fn detect_body_indent(body: Node, source: &str) -> String {
-    let bytes = source.as_bytes();
-    let start = body.start_byte();
-    let mut i = start;
-    // Anda para frente até achar o começo da linha seguinte ao `:`
-    // (o `block` começa logo depois da quebra de linha).
-    while i < bytes.len() && bytes[i] == b'\n' {
-        i += 1;
+/// Retorna o offset do início da linha do primeiro statement do `block`.
+///
+/// `body.start_byte()` aponta para o primeiro caractere **de conteúdo** do
+/// bloco (não para o começo da linha). Pulamos eventuais `\n` à frente e
+/// voltamos até o começo da linha.
+fn first_body_line_start(body: Node, bytes: &[u8]) -> usize {
+    let mut pos = body.start_byte();
+    while pos < bytes.len() && bytes[pos] == b'\n' {
+        pos += 1;
     }
-    let line_start = i;
+    let mut ls = pos;
+    while ls > 0 && bytes[ls - 1] != b'\n' {
+        ls -= 1;
+    }
+    ls
+}
+
+/// Conta espaços e tabs consecutivos a partir de `line_start`.
+/// Retorna "    " (4 espaços) se a linha começar direto com conteúdo.
+fn detect_indent_at(line_start: usize, bytes: &[u8]) -> String {
+    let mut i = line_start;
     while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b'\t') {
         i += 1;
     }
-    let indent = &source[line_start..i];
-    if indent.is_empty() {
+    if i == line_start {
         "    ".to_string()
     } else {
-        indent.to_string()
+        String::from_utf8_lossy(&bytes[line_start..i]).to_string()
     }
 }
 

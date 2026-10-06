@@ -1,9 +1,13 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use forge_core::{apply_edits, noqa, Config, Context, Diagnostic, Severity};
+use forge_core::{
+    apply_edits, baseline::Baseline, baseline::build_from, noqa, Config, Context, Diagnostic,
+    Severity,
+};
 use forge_lint::{default_registry, RuleRegistry};
 use forge_parser::{get_parser, parse_python_source};
 use serde::Serialize;
 use std::io::IsTerminal;
+use std::path::Path;
 use std::{fs, path::PathBuf, process};
 use walkdir::WalkDir;
 
@@ -34,6 +38,9 @@ enum Commands {
         /// Formato de saída.
         #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
         format: OutputFormat,
+        /// Silencia diagnósticos que já estão neste baseline (JSON).
+        #[arg(long)]
+        baseline: Option<PathBuf>,
     },
     /// Formata o código (ainda não implementado)
     Fmt {
@@ -50,6 +57,13 @@ enum Commands {
         /// Sai com código 1 se houver correções pendentes. Útil em CI.
         #[arg(long)]
         check: bool,
+    },
+    /// Gera um baseline a partir dos diagnósticos atuais
+    Baseline {
+        path: PathBuf,
+        /// Onde salvar o baseline (default: forge-baseline.json no CWD).
+        #[arg(long, default_value = "forge-baseline.json")]
+        output: PathBuf,
     },
     /// Explica uma regra (ou lista todas com --list)
     Explain {
@@ -79,22 +93,24 @@ fn main() {
             path,
             strict,
             format,
-        } => run_check(path, strict, format),
+            baseline,
+        } => run_check(path, strict, format, baseline),
         Commands::Fmt { path: _, check: _ } => println!("Formatter ainda não implementado."),
         Commands::Fix {
             path,
             dry_run,
             check,
         } => run_fix(path, dry_run, check),
+        Commands::Baseline { path, output } => run_baseline(path, output),
         Commands::Explain { code, list } => run_explain(code, list),
     }
 }
 
-fn load_config(path: &std::path::Path) -> Config {
+fn load_config(path: &Path) -> Config {
     let start = if path.is_dir() {
         path
     } else {
-        path.parent().unwrap_or(std::path::Path::new("."))
+        path.parent().unwrap_or(Path::new("."))
     };
     match Config::find_and_load(start) {
         Ok(Some((cfg_path, cfg))) => {
@@ -109,10 +125,65 @@ fn load_config(path: &std::path::Path) -> Config {
     }
 }
 
-fn run_check(path: PathBuf, strict: bool, format: OutputFormat) {
+/// Coleta os diagnósticos de um único arquivo, já com severidade da config
+/// aplicada mas **sem** `noqa` e **sem** baseline. Quem chama decide se
+/// aplica cada filtro.
+fn collect_diagnostics(
+    source: &str,
+    filepath: &str,
+    config: &Config,
+    registry: &RuleRegistry,
+    parser: &mut tree_sitter::Parser,
+) -> Vec<Diagnostic> {
+    let Some(tree) = parse_python_source(parser, source) else {
+        return Vec::new();
+    };
+    let ctx = Context {
+        source,
+        filepath,
+        config,
+    };
+    let mut diags: Vec<Diagnostic> = Vec::new();
+    for rule in registry.all() {
+        if !config.lint.is_enabled(rule.code()) {
+            continue;
+        }
+        let mut found = rule.check(tree.root_node(), &ctx);
+        for d in &mut found {
+            if let Some(sev) = config.lint.severity_for(&d.code) {
+                d.severity = sev;
+            }
+        }
+        diags.extend(found);
+    }
+    diags
+}
+
+fn load_baseline(path: &Option<PathBuf>) -> Option<Baseline> {
+    let path = path.as_ref()?;
+    match Baseline::load(path) {
+        Ok(b) => Some(b),
+        Err(e) => {
+            eprintln!(
+                "Erro ao carregar baseline {}: {}",
+                path.display(),
+                e
+            );
+            process::exit(2);
+        }
+    }
+}
+
+fn run_check(
+    path: PathBuf,
+    strict: bool,
+    format: OutputFormat,
+    baseline_path: Option<PathBuf>,
+) {
     let config = load_config(&path);
     let registry = default_registry();
     let mut parser = get_parser();
+    let baseline = load_baseline(&baseline_path);
 
     let mut collected: Vec<(String, Diagnostic)> = Vec::new();
 
@@ -128,33 +199,18 @@ fn run_check(path: PathBuf, strict: bool, format: OutputFormat) {
                 continue;
             }
         };
-        let tree = match parse_python_source(&mut parser, &source) {
-            Some(t) => t,
-            None => continue,
-        };
-        let ctx = Context {
-            source: &source,
-            filepath: filepath.to_str().unwrap_or("<unknown>"),
-            config: &config,
-        };
+        let filepath_str = filepath.to_str().unwrap_or("<unknown>");
 
-        let mut diags: Vec<Diagnostic> = Vec::new();
-        for rule in registry.all() {
-            if !config.lint.is_enabled(rule.code()) {
-                continue;
-            }
-            let mut found = rule.check(tree.root_node(), &ctx);
-            for diag in &mut found {
-                if let Some(sev) = config.lint.severity_for(&diag.code) {
-                    diag.severity = sev;
-                }
-            }
-            diags.extend(found);
-        }
-
+        let diags = collect_diagnostics(&source, filepath_str, &config, &registry, &mut parser);
+        // Primeiro `noqa`, depois baseline.
         let diags = noqa::filter_suppressed(diags, &source);
+        let diags = match &baseline {
+            Some(b) => b.filter(diags, filepath_str, &source),
+            None => diags,
+        };
+
         for d in diags {
-            collected.push((ctx.filepath.to_string(), d));
+            collected.push((filepath_str.to_string(), d));
         }
     }
 
@@ -202,6 +258,46 @@ fn run_check(path: PathBuf, strict: bool, format: OutputFormat) {
     }
 }
 
+fn run_baseline(path: PathBuf, output: PathBuf) {
+    let config = load_config(&path);
+    let registry = default_registry();
+    let mut parser = get_parser();
+
+    let mut entries = Vec::new();
+
+    for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+        if !entry.path().extension().map_or(false, |ext| ext == "py") {
+            continue;
+        }
+        let filepath = entry.path();
+        let source = match fs::read_to_string(filepath) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Erro ao ler {}: {}", filepath.display(), e);
+                continue;
+            }
+        };
+        let filepath_str = filepath.to_str().unwrap_or("<unknown>");
+
+        // Baseline reflete o que o `check` mostraria **sem** baseline,
+        // mas **com** `noqa` aplicado — arquivos `# noqa` não entram.
+        let diags = collect_diagnostics(&source, filepath_str, &config, &registry, &mut parser);
+        let diags = noqa::filter_suppressed(diags, &source);
+        entries.extend(build_from(&diags, filepath_str, &source));
+    }
+
+    let baseline = Baseline { entries };
+    if let Err(e) = baseline.save(&output) {
+        eprintln!("Erro ao salvar baseline: {}", e);
+        process::exit(2);
+    }
+    println!(
+        "Baseline salvo em {} ({} entrada(s)).",
+        output.display(),
+        baseline.entries.len()
+    );
+}
+
 fn run_fix(path: PathBuf, dry_run: bool, check: bool) {
     let config = load_config(&path);
     let registry = default_registry();
@@ -232,8 +328,6 @@ fn run_fix(path: PathBuf, dry_run: bool, check: bool) {
             config: &config,
         };
 
-        // Reúne todos os edits por regra, agrupando os diagnósticos que
-        // cada regra produziu.
         let mut edits = Vec::new();
         for rule in registry.all() {
             if !config.lint.is_enabled(rule.code()) {

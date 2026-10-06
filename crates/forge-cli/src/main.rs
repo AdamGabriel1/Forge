@@ -7,6 +7,7 @@ use forge_lint::{default_registry, Context, RuleRegistry};
 use forge_parser::{get_parser, parse_python_source};
 use rayon::prelude::*;
 use serde::Serialize;
+use similar::TextDiff;
 use std::collections::BTreeMap;
 use std::io::IsTerminal;
 use std::path::Path;
@@ -15,7 +16,7 @@ use walkdir::WalkDir;
 
 #[derive(Parser)]
 #[command(name = "forge")]
-#[command(author = "Adam")]
+#[command(author = "Você")]
 #[command(version = "0.1.0")]
 #[command(about = "Linter e Formatter para Python", long_about = None)]
 struct Cli {
@@ -61,6 +62,10 @@ enum Commands {
         /// precisa ser formatado. Útil em CI.
         #[arg(long)]
         check: bool,
+        /// Mostra um diff unificado em vez de só listar arquivos.
+        /// Implica `--check` (nunca escreve).
+        #[arg(long)]
+        diff: bool,
     },
     /// Aplica correções automáticas
     Fix {
@@ -110,7 +115,7 @@ fn main() {
             baseline,
             summary,
         } => run_check(path, strict, format, baseline, summary),
-        Commands::Fmt { path, check } => run_fmt(path, check),
+        Commands::Fmt { path, check, diff } => run_fmt(path, check, diff),
         Commands::Fix {
             path,
             dry_run,
@@ -292,7 +297,6 @@ fn print_summary_by_rule(collected: &[(String, Diagnostic)], registry: &RuleRegi
         println!("Nenhum problema encontrado!");
         return;
     }
-    // Ordena por contagem desc, desempate por código.
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
     for (_, d) in collected {
         *counts.entry(d.code.clone()).or_insert(0) += 1;
@@ -340,10 +344,12 @@ fn print_summary_by_file(collected: &[(String, Diagnostic)]) {
     }
 }
 
-fn run_fmt(path: PathBuf, check: bool) {
+fn run_fmt(path: PathBuf, check: bool, diff: bool) {
     let files = collect_python_files(&path);
 
-    let per_file: Vec<(String, String)> = files
+    // Fase 1 (paralela): formata cada arquivo em memória. Guarda também
+    // o original para o diff.
+    let per_file: Vec<(String, String, String)> = files
         .par_iter()
         .filter_map(|filepath| {
             let source = match fs::read_to_string(filepath) {
@@ -363,16 +369,22 @@ fn run_fmt(path: PathBuf, check: bool) {
             if formatted == source {
                 return None;
             }
-            Some((filepath.to_string_lossy().into_owned(), formatted))
+            Some((filepath.to_string_lossy().into_owned(), source, formatted))
         })
         .collect();
 
+    // Fase 2 (serial): ordena, imprime/escreve.
     let mut per_file = per_file;
     per_file.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut changed = 0usize;
-    for (filepath_str, formatted) in per_file {
+    for (filepath_str, original, formatted) in per_file {
         changed += 1;
+
+        if diff {
+            print_unified_diff(&filepath_str, &original, &formatted);
+            continue;
+        }
         if check {
             println!("{}: precisa formatar", filepath_str);
             continue;
@@ -384,14 +396,25 @@ fn run_fmt(path: PathBuf, check: bool) {
         println!("{}: formatado", filepath_str);
     }
 
-    if check && changed > 0 {
+    // `--diff` implica não escrever e sinalizar mudança pendente.
+    if (check || diff) && changed > 0 {
         process::exit(1);
     }
     if changed == 0 {
         println!("Tudo formatado.");
-    } else if !check {
+    } else if !check && !diff {
         println!("Resumo: {} arquivo(s) formatado(s).", changed);
     }
+}
+
+/// Imprime um diff unificado no estilo `git diff` entre `old` e `new`.
+fn print_unified_diff(filepath: &str, old: &str, new: &str) {
+    let diff = TextDiff::from_lines(old, new);
+    print!(
+        "{}",
+        diff.unified_diff()
+            .header(&format!("a/{filepath}"), &format!("b/{filepath}"))
+    );
 }
 
 fn run_baseline(path: PathBuf, output: PathBuf) {

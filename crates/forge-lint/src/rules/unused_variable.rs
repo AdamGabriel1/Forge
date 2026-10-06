@@ -35,7 +35,10 @@ impl Rule for UnusedVariable {
             // "usadas" pelo simples fato de existirem.
             if matches!(
                 binding.kind,
-                BindingKind::Parameter | BindingKind::Function | BindingKind::Class
+                BindingKind::Parameter
+                    | BindingKind::Function
+                    | BindingKind::Class
+                    | BindingKind::Import
             ) {
                 continue;
             }
@@ -202,5 +205,11 @@ def f():
     return 3
 ";
         assert_eq!(lint(&UnusedVariable, src).len(), 2);
+    }
+
+    #[test]
+    fn import_nao_reportado_como_variavel() {
+        let src = "import os\n";
+        assert_eq!(lint(&UnusedVariable, src).len(), 0);
     }
 }

@@ -117,9 +117,18 @@ fn desired_gap(prev: Node, next: Node) -> Option<String> {
         return Some(String::new());
     }
 
-    // 3. `(` de chamada: sem espaço antes.
-    if next.kind() == "(" && parent_is(next, "arguments") {
-        return Some(String::new());
+    // 3. `(` de chamada, subscript ou parâmetros: sem espaço antes.
+    //    O nome do nó varia entre versões do tree-sitter-python —
+    //    cobrimos `argument_list`, `arguments`, `call` e `parameters`.
+    if next.kind() == "(" {
+        if let Some(p) = next.parent() {
+            if matches!(
+                p.kind(),
+                "argument_list" | "arguments" | "call" | "parameters"
+            ) {
+                return Some(String::new());
+            }
+        }
     }
 
     // 4. `[` de subscript: sem espaço antes.
@@ -135,7 +144,29 @@ fn desired_gap(prev: Node, next: Node) -> Option<String> {
         return Some(String::new());
     }
 
-    // 6. `:` — contexto decide.
+    // 6. `:` no fim de cabeçalho de bloco (if, for, while, def, class,
+    //    try, except, else, finally): sem espaço antes.
+    if next.kind() == ":" {
+        if let Some(p) = next.parent() {
+            if matches!(
+                p.kind(),
+                "if_statement"
+                    | "for_statement"
+                    | "while_statement"
+                    | "with_statement"
+                    | "try_statement"
+                    | "except_clause"
+                    | "finally_clause"
+                    | "else_clause"
+                    | "function_definition"
+                    | "class_definition"
+            ) {
+                return Some(String::new());
+            }
+        }
+    }
+
+    // 7. `:` — contexto decide.
     //    slice: sem espaço dos dois lados.
     //    pair / typed_parameter / typed_default_parameter: espaço depois,
     //    nenhum antes.
@@ -158,7 +189,7 @@ fn desired_gap(prev: Node, next: Node) -> Option<String> {
         }
     }
 
-    // 7. Vírgula.
+    // 8. Vírgula.
     if prev.kind() == "," {
         if matches!(next.kind(), ")" | "]" | "}") {
             return Some(String::new());
@@ -169,27 +200,27 @@ fn desired_gap(prev: Node, next: Node) -> Option<String> {
         return Some(String::new());
     }
 
-    // 8. Walrus `:=` — espaço dos dois lados.
+    // 9. Walrus `:=` — espaço dos dois lados.
     if prev.kind() == ":=" || next.kind() == ":=" {
         return Some(" ".to_string());
     }
 
-    // 9. `->` em anotação de retorno — espaço dos dois lados.
+    // 10. `->` em anotação de retorno — espaço dos dois lados.
     if prev.kind() == "->" || next.kind() == "->" {
         return Some(" ".to_string());
     }
 
-    // 10. Operador unário colado ao operando.
+    // 11. Operador unário colado ao operando.
     if is_unary_op(prev) {
         return Some(String::new());
     }
 
-    // 11. Operador binário — espaço dos dois lados.
+    // 12. Operador binário — espaço dos dois lados.
     if is_binary_op(prev) || is_binary_op(next) {
         return Some(" ".to_string());
     }
 
-    // 12. `=` e variantes.
+    // 13. `=` e variantes.
     if is_assign_like_op(prev) || is_assign_like_op(next) {
         return Some(" ".to_string());
     }
@@ -315,13 +346,11 @@ fn fix_stmt_indent(node: Node, depth: usize, source: &str, edits: &mut Vec<Edit>
     let bytes = source.as_bytes();
     let start = node.start_byte();
 
-    // Encontra o começo da linha onde o nó começa.
     let mut line_start = start;
     while line_start > 0 && bytes[line_start - 1] != b'\n' {
         line_start -= 1;
     }
 
-    // Consome espaços/tabs iniciais.
     let mut ws_end = line_start;
     while ws_end < bytes.len() && (bytes[ws_end] == b' ' || bytes[ws_end] == b'\t') {
         ws_end += 1;
@@ -531,6 +560,11 @@ mod tests {
     }
 
     #[test]
+    fn sem_espaco_antes_de_parentese_de_parametros() {
+        assert_eq!(fmt("def f ():\n    pass\n"), "def f():\n    pass\n");
+    }
+
+    #[test]
     fn sem_espaco_antes_de_colchete_de_subscript() {
         assert_eq!(fmt("x [1]\n"), "x[1]\n");
     }
@@ -542,7 +576,7 @@ mod tests {
         assert_eq!(fmt("x .y\n"), "x.y\n");
     }
 
-    // ---- `:` em dict / anotação / slice ----
+    // ---- `:` em dict / anotação / slice / cabeçalho ----
 
     #[test]
     fn espaco_em_dict_colon() {
@@ -568,6 +602,24 @@ mod tests {
     #[test]
     fn slice_colon_sem_espaco() {
         assert_eq!(fmt("x = a[1:2]\n"), "x = a[1:2]\n");
+    }
+
+    #[test]
+    fn remove_espaco_antes_de_colon_em_if() {
+        assert_eq!(fmt("if x :\n    pass\n"), "if x:\n    pass\n");
+    }
+
+    #[test]
+    fn remove_espaco_antes_de_colon_em_def() {
+        assert_eq!(fmt("def f() :\n    pass\n"), "def f():\n    pass\n");
+    }
+
+    #[test]
+    fn remove_espaco_antes_de_colon_em_else() {
+        assert_eq!(
+            fmt("if x:\n    pass\nelse :\n    pass\n"),
+            "if x:\n    pass\nelse:\n    pass\n"
+        );
     }
 
     // ---- walrus, arrow, decorator ----
@@ -747,6 +799,13 @@ def f():
     #[test]
     fn idempotente_indentacao() {
         let first = fmt("def f():\n  x = 1\n  return x\n");
+        let second = fmt(&first);
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn idempotente_chamadas() {
+        let first = fmt("f (x) . y\n");
         let second = fmt(&first);
         assert_eq!(first, second);
     }

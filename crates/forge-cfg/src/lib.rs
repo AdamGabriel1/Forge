@@ -7,6 +7,10 @@ pub mod dataflow;
 pub mod definite_assignment;
 pub mod nullable;
 
+pub use dataflow::{run_block, Analysis};
+pub use definite_assignment::{collect_locals, AssignState, DefiniteAssignmentAnalysis};
+pub use nullable::{Nullable, NullableAnalysis, NullableState};
+
 /// `true` se o nó é uma instrução que encerra o fluxo linear do bloco.
 pub fn is_terminator(node: Node) -> bool {
     matches!(

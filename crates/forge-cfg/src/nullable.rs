@@ -140,9 +140,17 @@ impl<'src> Analysis for NullableAnalysis<'src> {
         let bytes = self.src();
 
         match node.kind() {
+            // `x = 1` e `x.foo()` vêm embrulhados em `expression_statement`.
+            // Desembrulhamos e despachamos para o nó real — sem isso, o
+            // estado nunca é atualizado por atribuições.
+            "expression_statement" => {
+                if let Some(inner) = node.named_child(0) {
+                    return self.transfer(inner, state, diags);
+                }
+            }
+
             "assignment" => {
-                // RHS é avaliado primeiro em Python — derefs lá usam o
-                // estado de entrada.
+                // RHS é avaliado primeiro em Python.
                 if let Some(right) = node.child_by_field_name("right") {
                     self.walk_expr(right, state, diags);
                 }
@@ -161,8 +169,8 @@ impl<'src> Analysis for NullableAnalysis<'src> {
                     }
                 }
             }
+
             _ => {
-                // Qualquer outro nó: procura derefs nas sub-expressões.
                 self.walk_expr(node, state, diags);
             }
         }

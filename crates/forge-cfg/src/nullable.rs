@@ -121,6 +121,33 @@ impl<'src> NullableAnalysis<'src> {
             }
         }
     }
+
+    /// Marca o alvo do loop como `Unknown`. O valor iterado pode ser
+    /// qualquer coisa, inclusive `None`, mas também pode ser uma coleção
+    /// de objetos — sem análise de valor não temos como decidir.
+    fn bind_target_to_unknown<'tree>(&self, target: Node<'tree>, state: &mut NullableState) {
+        match target.kind() {
+            "identifier" => {
+                if let Ok(name) = target.utf8_text(self.src()) {
+                    state.set(name, Nullable::Unknown);
+                }
+            }
+            "pattern_list"
+            | "tuple_pattern"
+            | "list_pattern"
+            | "list_splat_pattern"
+            | "dictionary_splat_pattern"
+            | "as_pattern_target" => {
+                let mut cursor = target.walk();
+                for child in target.children(&mut cursor) {
+                    if child.is_named() {
+                        self.bind_target_to_unknown(child, state);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 impl<'src> Analysis for NullableAnalysis<'src> {
@@ -141,8 +168,6 @@ impl<'src> Analysis for NullableAnalysis<'src> {
 
         match node.kind() {
             // `x = 1` e `x.foo()` vêm embrulhados em `expression_statement`.
-            // Desembrulhamos e despachamos para o nó real — sem isso, o
-            // estado nunca é atualizado por atribuições.
             "expression_statement" => {
                 if let Some(inner) = node.named_child(0) {
                     return self.transfer(inner, state, diags);
@@ -207,6 +232,12 @@ impl<'src> Analysis for NullableAnalysis<'src> {
         }
         new
     }
+
+    fn bind_loop_target<'tree>(&self, target: Node<'tree>, state: &Self::State) -> Self::State {
+        let mut new = state.clone();
+        self.bind_target_to_unknown(target, &mut new);
+        new
+    }
 }
 
 fn check_deref(
@@ -250,7 +281,6 @@ fn classify_value(node: Node, bytes: &[u8]) -> Nullable {
     if node.kind() == "none" {
         return Nullable::DefinitelyNone;
     }
-    // `x = y` — propaga? Poderia, mas deixamos como Unknown por simplicidade.
     if node.kind() == "identifier" {
         let _ = node.utf8_text(bytes);
         return Nullable::Unknown;
@@ -270,10 +300,10 @@ fn parse_none_check<'tree>(cond: Node<'tree>, bytes: &'tree [u8]) -> Option<(&'t
     let first = children.iter().find(|c| c.is_named())?;
     let last = children.iter().rev().find(|c| c.is_named())?;
 
-    let (id_node, _op_side) = if first.kind() == "none" {
-        (last, 0)
+    let id_node = if first.kind() == "none" {
+        last
     } else if last.kind() == "none" {
-        (first, 1)
+        first
     } else {
         return None;
     };

@@ -1,9 +1,7 @@
 use crate::util::walk;
-use crate::Context;
 use crate::Rule;
-use forge_cfg::dataflow::{run_block, Analysis};
-use forge_cfg::definite_assignment::{collect_locals, DefiniteAssignmentAnalysis};
-use forge_core::Diagnostic;
+use forge_cfg::{collect_locals, run_block, Analysis, DefiniteAssignmentAnalysis};
+use forge_core::{Context, Diagnostic};
 use tree_sitter::Node;
 
 pub struct UsedBeforeAssignment;
@@ -51,7 +49,7 @@ mod tests {
     use super::*;
     use crate::util::test_util::lint;
 
-    // ---- casos básicos (v1 também cobria) ----
+    // ---- casos básicos ----
 
     #[test]
     fn uso_antes_de_atribuicao_local() {
@@ -125,7 +123,7 @@ def f():
         assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
     }
 
-    // ---- casos novos: sensíveis a caminho ----
+    // ---- sensíveis a caminho ----
 
     #[test]
     fn if_sem_else_apenas_then_atribui_reporta() {
@@ -207,6 +205,52 @@ def f():
     y = x
     x = 1
     return y
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
+    }
+
+    // ---- loops (fixed-point) ----
+
+    #[test]
+    fn for_loop_target_nao_reporta() {
+        let src = "\
+def f(items):
+    for i in items:
+        print(i)
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
+    }
+
+    #[test]
+    fn uso_de_target_apos_for_reporta() {
+        // Se items for vazio, `i` não existe depois do loop.
+        let src = "\
+def f(items):
+    for i in items:
+        pass
+    print(i)
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
+    }
+
+    #[test]
+    fn while_body_reatribui_target_reporta() {
+        let src = "\
+def f():
+    while True:
+        print(x)
+        x = 1
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
+    }
+
+    #[test]
+    fn loop_emite_diag_uma_vez() {
+        let src = "\
+def f(items):
+    for i in items:
+        print(y)
+        y = 1
 ";
         assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
     }

@@ -1,9 +1,7 @@
 use crate::util::walk;
-use crate::Context;
 use crate::Rule;
-use forge_cfg::dataflow::{run_block, Analysis};
-use forge_cfg::nullable::NullableAnalysis;
-use forge_core::Diagnostic;
+use forge_cfg::{run_block, Analysis, NullableAnalysis};
+use forge_core::{Context, Diagnostic};
 use tree_sitter::Node;
 
 pub struct PossibleNoneDereference;
@@ -108,8 +106,6 @@ x.foo()
 ";
         assert_eq!(lint(&PossibleNoneDereference, src).len(), 1);
     }
-
-    // ---- casos que exigem data-flow ----
 
     #[test]
     fn if_else_ambos_none_reporta() {
@@ -216,5 +212,52 @@ def f():
     x.bar
 ";
         assert_eq!(lint(&PossibleNoneDereference, src).len(), 2);
+    }
+
+    // ---- loops (fixed-point) ----
+
+    #[test]
+    fn loop_simples_nao_reporta() {
+        // `for x in items` — x é Unknown, não dispara.
+        let src = "\
+def f(items):
+    for x in items:
+        x.foo()
+";
+        assert_eq!(lint(&PossibleNoneDereference, src).len(), 0);
+    }
+
+    #[test]
+    fn loop_body_x_none_reporta() {
+        let src = "\
+def f():
+    while True:
+        x = None
+        x.foo()
+";
+        assert_eq!(lint(&PossibleNoneDereference, src).len(), 1);
+    }
+
+    #[test]
+    fn loop_body_reatribui_antes_de_usar_ok() {
+        let src = "\
+def f(items):
+    x = None
+    for i in items:
+        x = get()
+        x.foo()
+";
+        assert_eq!(lint(&PossibleNoneDereference, src).len(), 0);
+    }
+
+    #[test]
+    fn loop_emite_diag_uma_vez() {
+        let src = "\
+def f(items):
+    x = None
+    for i in items:
+        x.foo()
+";
+        assert_eq!(lint(&PossibleNoneDereference, src).len(), 1);
     }
 }

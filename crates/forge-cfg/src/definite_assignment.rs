@@ -75,7 +75,6 @@ impl<'src> DefiniteAssignmentAnalysis<'src> {
         match node.kind() {
             "function_definition" | "class_definition" | "lambda" => {}
             "attribute" => {
-                // `obj.attr`: só `obj` é leitura. `attr` não é variável.
                 if let Some(obj) = node.child_by_field_name("object") {
                     self.walk_reads(obj, state, diags);
                 }
@@ -89,7 +88,6 @@ impl<'src> DefiniteAssignmentAnalysis<'src> {
                 }
             }
             "keyword_argument" => {
-                // `f(x=1)` — o nome do parâmetro (`x`) não é uma variável.
                 if let Some(v) = node.child_by_field_name("value") {
                     self.walk_reads(v, state, diags);
                 }
@@ -152,7 +150,6 @@ impl<'src> DefiniteAssignmentAnalysis<'src> {
                 }
             }
             "attribute" | "subscript" => {
-                // `x.y = 1` — `x` é leitura.
                 self.walk_reads(node, state, diags);
             }
             _ => {}
@@ -184,7 +181,6 @@ impl<'src> Analysis for DefiniteAssignmentAnalysis<'src> {
                 }
             }
             "assignment" => {
-                // RHS é avaliado primeiro.
                 if let Some(right) = node.child_by_field_name("right") {
                     self.walk_reads(right, state, diags);
                 }
@@ -226,14 +222,20 @@ impl<'src> Analysis for DefiniteAssignmentAnalysis<'src> {
         }
         new
     }
+
+    fn bind_loop_target<'tree>(&self, target: Node<'tree>, state: &Self::State) -> Self::State {
+        let mut new = state.clone();
+        let mut scratch = Vec::new();
+        self.bind_target(target, &mut new, &mut scratch);
+        new
+    }
 }
 
 /// Coleta nomes "locais" e "parâmetros" de uma `function_definition`.
 ///
-/// Locals = tudo que aparece como alvo de atribuição simples ou walrus
-/// (`:=`) no corpo. Não inclui alvos de `for`, `with`, `except` nem
-/// compreensões — fica para uma segunda passada, quando cobrirmos esses
-/// casos no motor.
+/// Locals = tudo que aparece como alvo de `assignment`, `named_expression`
+/// (walrus) ou `for` no corpo. Não inclui alvos de `with`/`except` nem
+/// compreensões — fica para uma segunda passada.
 pub fn collect_locals(func_def: Node, source: &str) -> (HashSet<String>, HashSet<String>) {
     let mut locals = HashSet::new();
     let mut params = HashSet::new();
@@ -290,6 +292,11 @@ fn walk_collect(node: Node, source: &str, locals: &mut HashSet<String>) {
                 if let Ok(n) = name.utf8_text(source.as_bytes()) {
                     locals.insert(n.to_string());
                 }
+            }
+        }
+        "for_statement" => {
+            if let Some(left) = node.child_by_field_name("left") {
+                collect_target_names(left, source, locals);
             }
         }
         _ => {}

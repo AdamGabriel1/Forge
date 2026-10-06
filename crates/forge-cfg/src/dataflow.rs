@@ -1,16 +1,26 @@
-//! Framework minimalista de data-flow sobre a CST.
+//! Framework de data-flow sobre a CST com ponto fixo para loops.
 //!
-//! Em vez de materializar um CFG explícito com nós e arestas, o walker
-//! recursivo embute o fluxo na própria recursão: `if/else` vira dois
-//! ramos independentes que fazem merge no ponto de junção; `while/for`
-//! viram um único passo com merge conservador.
+//! Em vez de materializar um CFG explícito, o walker recursivo embute o
+//! fluxo na própria recursão:
 //!
-//! Esse modelo é suficiente para análises sensíveis a caminho como
-//! "possivelmente None". Quando quisermos `constant propagation` ou
-//! `definite assignment` de verdade, migramos para um CFG materializado.
+//! - `if/else`: dois ramos independentes que fazem merge no ponto de
+//!   junção, com `refine` aplicado à condição em cada lado.
+//! - `while`/`for`: iteração até ponto fixo. O estado no loop head é
+//!   recomputado até convergir (`new_head == loop_head`), com um teto
+//!   de iterações como garantia de terminação.
+//!
+//! Esse modelo cobre as análises sensíveis a caminho implementadas
+//! (nullable, definite assignment) e é a base para futuras migrações
+//! para CFG materializado — o trait `Analysis` sobrevive a essa troca.
 
 use forge_core::Diagnostic;
 use tree_sitter::Node;
+
+/// Teto de iterações do ponto fixo em loops. Para as duas análises
+/// atuais (nullable e definite assignment), convergência ocorre em
+/// poucas iterações — o teto protege contra análises futuras cujo
+/// lattice não seja finito.
+const MAX_FIXPOINT_ITERS: usize = 64;
 
 pub trait Analysis {
     /// Estado abstrato que flui pelos caminhos.
@@ -40,6 +50,14 @@ pub trait Analysis {
 
     /// Combina dois estados de caminhos diferentes no ponto de junção.
     fn merge(&self, a: &Self::State, b: &Self::State) -> Self::State;
+
+    /// Aplica o efeito de "esta variável é atribuída a cada iteração do
+    /// loop". Chamado uma vez, antes do ponto fixo, com o alvo do `for`.
+    ///
+    /// Default: no-op. Análises que rastreiam variáveis devem sobrescrever.
+    fn bind_loop_target<'tree>(&self, _target: Node<'tree>, state: &Self::State) -> Self::State {
+        state.clone()
+    }
 }
 
 /// Roda a análise sobre um bloco (corpo de função ou módulo).
@@ -49,10 +67,16 @@ pub fn run_block<'tree, A: Analysis>(
     analysis: &A,
     diags: &mut Vec<Diagnostic>,
 ) -> A::State {
-    // Alguns wrappers vêm com o `block` dentro (else_clause, finally_clause).
-    // Desembrulhamos para que os statements internos sejam vistos.
-    let body = unwrap_body(body);
+    run_statements(body, initial, analysis, diags)
+}
 
+fn run_statements<'tree, A: Analysis>(
+    body: Node<'tree>,
+    initial: A::State,
+    analysis: &A,
+    diags: &mut Vec<Diagnostic>,
+) -> A::State {
+    let body = unwrap_body(body);
     let mut cursor = body.walk();
     let stmts: Vec<Node<'tree>> = body
         .children(&mut cursor)
@@ -64,83 +88,28 @@ pub fn run_block<'tree, A: Analysis>(
     for stmt in stmts {
         match stmt.kind() {
             "if_statement" => {
-                let Some(cond) = stmt.child_by_field_name("condition") else {
-                    continue;
-                };
-                let Some(cons) = stmt.child_by_field_name("consequence") else {
-                    continue;
-                };
-                let alt = stmt.child_by_field_name("alternative");
-
-                // A condição em si pode desreferenciar variáveis.
-                current = analysis.transfer(cond, &current, diags);
-
-                let s_then_in = analysis.refine(cond, &current, true);
-                let s_else_in = analysis.refine(cond, &current, false);
-
-                let mut d_then = Vec::new();
-                let s_then_out = run_block(cons, s_then_in, analysis, &mut d_then);
-
-                let (s_else_out, d_else) = match alt {
-                    Some(eb) => {
-                        let mut d = Vec::new();
-                        let s = run_block(eb, s_else_in, analysis, &mut d);
-                        (s, d)
-                    }
-                    None => (s_else_in, Vec::new()),
-                };
-
-                diags.extend(d_then);
-                diags.extend(d_else);
-
-                current = analysis.merge(&s_then_out, &s_else_out);
+                current = run_if(stmt, current, analysis, diags);
             }
-
             "while_statement" | "for_statement" => {
-                let Some(body_node) = stmt.child_by_field_name("body") else {
-                    continue;
-                };
-                let cond = stmt.child_by_field_name("condition");
-                let iter = stmt.child_by_field_name("right");
-
-                if let Some(expr) = cond.or(iter) {
-                    current = analysis.transfer(expr, &current, diags);
-                }
-
-                let loop_in = if let Some(c) = cond {
-                    analysis.refine(c, &current, true)
-                } else {
-                    current.clone()
-                };
-
-                let mut d_body = Vec::new();
-                let body_out = run_block(body_node, loop_in.clone(), analysis, &mut d_body);
-                diags.extend(d_body);
-
-                current = analysis.merge(&current, &body_out);
+                current = run_loop(stmt, current, analysis, diags);
             }
-
             "return_statement" | "raise_statement" => {
-                let mut cursor = stmt.walk();
-                for child in stmt.children(&mut cursor) {
+                let mut c = stmt.walk();
+                for child in stmt.children(&mut c) {
                     if child.is_named() {
                         analysis.transfer(child, &current, diags);
                     }
                 }
                 return current;
             }
-
             "break_statement" | "continue_statement" => {
                 return current;
             }
-
-            // Blocos aninhados (else_clause, finally_clause wrappers,
-            // try/except/with) — processa como novo bloco.
+            // Blocos aninhados (else_clause, finally_clause, with, try).
             "block" | "else_clause" | "finally_clause" | "except_clause" | "with_statement"
             | "try_statement" => {
-                current = run_block(stmt, current, analysis, diags);
+                current = run_statements(stmt, current, analysis, diags);
             }
-
             _ => {
                 current = analysis.transfer(stmt, &current, diags);
             }
@@ -148,6 +117,108 @@ pub fn run_block<'tree, A: Analysis>(
     }
 
     current
+}
+
+fn run_if<'tree, A: Analysis>(
+    stmt: Node<'tree>,
+    state: A::State,
+    analysis: &A,
+    diags: &mut Vec<Diagnostic>,
+) -> A::State {
+    let Some(cond) = stmt.child_by_field_name("condition") else {
+        return state;
+    };
+    let Some(cons) = stmt.child_by_field_name("consequence") else {
+        return state;
+    };
+    let alt = stmt.child_by_field_name("alternative");
+
+    // A condição em si pode desreferenciar variáveis.
+    let state_after_cond = analysis.transfer(cond, &state, diags);
+
+    let s_then_in = analysis.refine(cond, &state_after_cond, true);
+    let s_else_in = analysis.refine(cond, &state_after_cond, false);
+
+    let mut d_then = Vec::new();
+    let s_then_out = run_statements(cons, s_then_in, analysis, &mut d_then);
+
+    let (s_else_out, d_else) = match alt {
+        Some(eb) => {
+            let mut d = Vec::new();
+            let s = run_statements(eb, s_else_in, analysis, &mut d);
+            (s, d)
+        }
+        None => (s_else_in, Vec::new()),
+    };
+
+    diags.extend(d_then);
+    diags.extend(d_else);
+
+    analysis.merge(&s_then_out, &s_else_out)
+}
+
+fn run_loop<'tree, A: Analysis>(
+    stmt: Node<'tree>,
+    state_before: A::State,
+    analysis: &A,
+    diags: &mut Vec<Diagnostic>,
+) -> A::State {
+    let cond = stmt.child_by_field_name("condition");
+    let iter = stmt.child_by_field_name("right");
+    let left = stmt.child_by_field_name("left");
+    let Some(body) = stmt.child_by_field_name("body") else {
+        return state_before;
+    };
+
+    // Processa a expressão do loop: condição (`while`) ou iterável (`for`).
+    let state_after_expr = if let Some(expr) = cond.or(iter) {
+        analysis.transfer(expr, &state_before, diags)
+    } else {
+        state_before.clone()
+    };
+
+    // O alvo do `for` é atribuído a cada iteração, logo antes do corpo.
+    // Mantemos `state_after_expr` separado — ele é o estado se o loop
+    // nunca executar (importante para o merge de saída).
+    let state_at_head = if let Some(target) = left {
+        analysis.bind_loop_target(target, &state_after_expr)
+    } else {
+        state_after_expr.clone()
+    };
+
+    // Ponto fixo: itera o corpo até o estado no loop head estabilizar.
+    let mut loop_head = state_at_head.clone();
+    let mut final_diags: Vec<Diagnostic> = Vec::new();
+
+    for _ in 0..MAX_FIXPOINT_ITERS {
+        let body_in = match cond {
+            Some(c) => analysis.refine(c, &loop_head, true),
+            None => loop_head.clone(),
+        };
+
+        let mut iter_diags = Vec::new();
+        let body_out = run_statements(body, body_in, analysis, &mut iter_diags);
+
+        let new_head = analysis.merge(&state_at_head, &body_out);
+        final_diags = iter_diags;
+
+        if new_head == loop_head {
+            break;
+        }
+        loop_head = new_head;
+    }
+
+    diags.extend(final_diags);
+
+    // Estado de saída:
+    //   - Se o loop nunca executou: `state_after_expr`.
+    //   - Se executou e terminou: `loop_head` refinado por `!cond`
+    //     (para `for`, não há cond, então é `loop_head` direto).
+    let exit_from_loop = match cond {
+        Some(c) => analysis.refine(c, &loop_head, false),
+        None => loop_head,
+    };
+    analysis.merge(&state_after_expr, &exit_from_loop)
 }
 
 /// Se `node` é um wrapper (else_clause, finally_clause, etc.) que contém

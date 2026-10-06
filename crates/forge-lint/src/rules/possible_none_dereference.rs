@@ -1,6 +1,8 @@
-use crate::util::range_of;
+use crate::util::walk;
 use crate::Rule;
-use forge_core::{Context, Diagnostic, Range, Severity};
+use forge_cfg::dataflow::run_block;
+use forge_cfg::nullable::NullableAnalysis;
+use forge_core::{Context, Diagnostic, Severity};
 use tree_sitter::Node;
 
 pub struct PossibleNoneDereference;
@@ -13,155 +15,31 @@ impl Rule for PossibleNoneDereference {
         "possible_none_dereference"
     }
     fn description(&self) -> &str {
-        "Uma variável atribuída a `None` é desreferenciada sem checagem — `AttributeError` em runtime."
+        "Variável que pode ser `None` é desreferenciada sem checagem, causando `TypeError` em runtime."
     }
     fn fix_hint(&self) -> &str {
-        "Adicione `if x is not None:` antes, ou atribua um valor não-None."
+        "Adicione `if x is not None:` antes, ou atribua um valor não-`None`."
     }
 
     fn check(&self, node: Node, ctx: &Context) -> Vec<Diagnostic> {
+        let analysis = NullableAnalysis::new(ctx.source);
         let mut diagnostics = Vec::new();
-        visit_scopes(node, ctx.source, &mut diagnostics);
+
+        // Top-level: variáveis de módulo.
+        run_block(node, analysis.initial(), &analysis, &mut diagnostics);
+
+        // Cada função tem seu próprio escopo.
+        walk(node, &mut |n| {
+            if n.kind() != "function_definition" {
+                return;
+            }
+            let Some(body) = n.child_by_field_name("body") else {
+                return;
+            };
+            run_block(body, analysis.initial(), &analysis, &mut diagnostics);
+        });
+
         diagnostics
-    }
-}
-
-fn visit_scopes(node: Node, source: &str, out: &mut Vec<Diagnostic>) {
-    match node.kind() {
-        "module" | "function_definition" => {
-            analyze_scope(node, source, out);
-            let mut cursor = node.walk();
-            for child in node.children(&mut cursor) {
-                visit_scopes(child, source, out);
-            }
-        }
-        _ => {
-            let mut cursor = node.walk();
-            for child in node.children(&mut cursor) {
-                visit_scopes(child, source, out);
-            }
-        }
-    }
-}
-
-struct Assignment {
-    name: String,
-    line: usize,
-    col: usize,
-    is_none: bool,
-}
-
-struct Access {
-    name: String,
-    range: Range,
-}
-
-fn analyze_scope(scope_node: Node, source: &str, out: &mut Vec<Diagnostic>) {
-    let body = if scope_node.kind() == "function_definition" {
-        match scope_node.child_by_field_name("body") {
-            Some(b) => b,
-            None => return,
-        }
-    } else {
-        scope_node
-    };
-
-    let mut assignments: Vec<Assignment> = Vec::new();
-    let mut accesses: Vec<Access> = Vec::new();
-    walk_collecting(body, source, &mut assignments, &mut accesses);
-
-    if assignments.is_empty() || accesses.is_empty() {
-        return;
-    }
-
-    for access in &accesses {
-        let use_pos = (access.range.start_line, access.range.start_col);
-        let last = assignments
-            .iter()
-            .filter(|a| a.name == access.name)
-            .filter(|a| (a.line, a.col) < use_pos)
-            .max_by_key(|a| (a.line, a.col));
-
-        if let Some(a) = last {
-            if a.is_none {
-                out.push(Diagnostic::new(
-                    "FOR013",
-                    &format!(
-                        "`{}` foi atribuído a `None` e depois desreferenciado — `AttributeError` em runtime.",
-                        access.name
-                    ),
-                    access.range.clone(),
-                    Severity::Warning,
-                ));
-            }
-        }
-    }
-}
-
-fn walk_collecting(
-    node: Node,
-    source: &str,
-    assignments: &mut Vec<Assignment>,
-    accesses: &mut Vec<Access>,
-) {
-    // Não descer em escopos aninhados.
-    if matches!(
-        node.kind(),
-        "function_definition" | "class_definition" | "lambda"
-    ) {
-        return;
-    }
-
-    match node.kind() {
-        "assignment" => {
-            if let Some(left) = node.child_by_field_name("left") {
-                if left.kind() == "identifier" {
-                    if let Ok(name) = left.utf8_text(source.as_bytes()) {
-                        let is_none = node
-                            .child_by_field_name("right")
-                            .map(|r| r.kind() == "none")
-                            .unwrap_or(false);
-                        let pos = left.start_position();
-                        assignments.push(Assignment {
-                            name: name.to_string(),
-                            line: pos.row,
-                            col: pos.column,
-                            is_none,
-                        });
-                    }
-                }
-            }
-        }
-        "attribute" => {
-            if let Some(object) = node.child_by_field_name("object") {
-                if object.kind() == "identifier" {
-                    if let Ok(name) = object.utf8_text(source.as_bytes()) {
-                        accesses.push(Access {
-                            name: name.to_string(),
-                            range: range_of(object),
-                        });
-                    }
-                }
-            }
-        }
-        "subscript" => {
-            if let Some(value) = node.child_by_field_name("value") {
-                if value.kind() == "identifier" {
-                    if let Ok(name) = value.utf8_text(source.as_bytes()) {
-                        accesses.push(Access {
-                            name: name.to_string(),
-                            range: range_of(value),
-                        });
-                    }
-                }
-            }
-        }
-        _ => {}
-    }
-
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        walk_collecting(child, source, assignments, accesses);
     }
 }
 
@@ -171,7 +49,7 @@ mod tests {
     use crate::util::test_util::lint;
 
     #[test]
-    fn none_assign_depois_attr() {
+    fn none_literal_imediato() {
         let src = "\
 def f():
     x = None
@@ -181,7 +59,7 @@ def f():
     }
 
     #[test]
-    fn none_assign_depois_subscript() {
+    fn subscript_apos_none() {
         let src = "\
 def f():
     x = None
@@ -191,18 +69,18 @@ def f():
     }
 
     #[test]
-    fn reatribuido_antes_do_uso_ok() {
+    fn reatribuicao_antes_do_uso_ok() {
         let src = "\
 def f():
     x = None
-    x = get_value()
+    x = 5
     x.foo()
 ";
         assert_eq!(lint(&PossibleNoneDereference, src).len(), 0);
     }
 
     #[test]
-    fn sem_atribuicao_none_ok() {
+    fn sem_none_ok() {
         let src = "\
 def f():
     x = 1
@@ -222,18 +100,7 @@ def f():
     }
 
     #[test]
-    fn multiplos_derefs_apos_none() {
-        let src = "\
-def f():
-    x = None
-    x.foo
-    x.bar
-";
-        assert_eq!(lint(&PossibleNoneDereference, src).len(), 2);
-    }
-
-    #[test]
-    fn modulo_scope() {
+    fn modulo_top_level() {
         let src = "\
 x = None
 x.foo()
@@ -241,19 +108,94 @@ x.foo()
         assert_eq!(lint(&PossibleNoneDereference, src).len(), 1);
     }
 
+    // ---- casos que exigem data-flow ----
+
     #[test]
-    fn funcao_aninhada_nao_afeta() {
-        // `x` da função externa não é o mesmo da interna — pulamos
-        // escopos aninhados.
+    fn if_else_ambos_none_reporta() {
         let src = "\
-def outer():
+def f(c):
     x = None
-    def inner():
-        x = 1
+    if c:
+        x = None
+    else:
+        x = None
+    x.foo()
+";
+        assert_eq!(lint(&PossibleNoneDereference, src).len(), 1);
+    }
+
+    #[test]
+    fn if_else_mistura_reporta() {
+        // Uma branch define None, a outra não → MaybeNone.
+        let src = "\
+def f(c):
+    x = 5
+    if c:
+        x = None
+    x.foo()
+";
+        assert_eq!(lint(&PossibleNoneDereference, src).len(), 1);
+    }
+
+    #[test]
+    fn if_not_none_guarda() {
+        // O `if x is not None:` refina o estado para NotNone dentro do ramo.
+        let src = "\
+def f():
+    x = None
+    if x is not None:
         x.foo()
-    return inner
 ";
         assert_eq!(lint(&PossibleNoneDereference, src).len(), 0);
+    }
+
+    #[test]
+    fn if_not_none_com_else_reporta_no_else() {
+        let src = "\
+def f():
+    x = None
+    if x is not None:
+        x.foo()
+    else:
+        x.bar()
+";
+        assert_eq!(lint(&PossibleNoneDereference, src).len(), 1);
+    }
+
+    #[test]
+    fn if_is_none_reporta_no_then() {
+        let src = "\
+def f():
+    x = None
+    if x is None:
+        x.foo()
+";
+        assert_eq!(lint(&PossibleNoneDereference, src).len(), 1);
+    }
+
+    #[test]
+    fn reatribuicao_em_ambas_as_branches_ok() {
+        let src = "\
+def f(c):
+    x = None
+    if c:
+        x = 1
+    else:
+        x = 2
+    x.foo()
+";
+        assert_eq!(lint(&PossibleNoneDereference, src).len(), 0);
+    }
+
+    #[test]
+    fn modulo_scope_com_branch() {
+        let src = "\
+x = None
+if cond:
+    x = 5
+x.foo()
+";
+        assert_eq!(lint(&PossibleNoneDereference, src).len(), 1);
     }
 
     #[test]
@@ -267,14 +209,13 @@ def f():
     }
 
     #[test]
-    fn attr_de_atribuicao_nao_conta() {
-        // `x.foo = 5` — o LHS é attribute, não identifier; não vira
-        // assignment de `x`, e o `x` do LHS será registrado como acesso.
+    fn multiplos_derefs_apos_none() {
         let src = "\
 def f():
     x = None
-    x.foo = 5
+    x.foo
+    x.bar
 ";
-        assert_eq!(lint(&PossibleNoneDereference, src).len(), 1);
+        assert_eq!(lint(&PossibleNoneDereference, src).len(), 2);
     }
 }

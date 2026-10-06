@@ -1,13 +1,10 @@
-//! Análise de fluxo de controle linear sobre a CST.
-//!
-//! Nesta primeira versão, o crate expõe helpers que identificam
-//! terminadores (`return`, `raise`, `break`, `continue`) e código
-//! inalcançável em blocos lineares. Um CFG completo com nós e arestas
-//! será adicionado quando chegarmos em `FOR013 possible_none_dereference`,
-//! que exige análise de fluxo de dados real.
+//! Análise de fluxo de controle e data-flow sobre a CST.
 
 use forge_core::Range;
 use tree_sitter::Node;
+
+pub mod dataflow;
+pub mod nullable;
 
 /// `true` se o nó é uma instrução que encerra o fluxo linear do bloco.
 pub fn is_terminator(node: Node) -> bool {
@@ -17,13 +14,8 @@ pub fn is_terminator(node: Node) -> bool {
     )
 }
 
-/// Retorna os ranges de todas as instruções diretas de um `block`
-/// que vêm **depois** do primeiro terminador. Se não houver terminador,
-/// retorna vazio.
-///
-/// Só olha os filhos diretos. `if cond: return` não conta como terminador
-/// do bloco externo, porque o `return` é condicional. Essa é a escolha
-/// conservadora correta para evitar falsos positivos.
+/// Retorna os ranges de todas as instruções diretas de um `block` que vêm
+/// **depois** do primeiro terminador. Se não houver terminador, retorna vazio.
 pub fn find_unreachable_in_block(block: Node) -> Vec<Range> {
     let mut cursor = block.walk();
     let stmts: Vec<Node> = block
@@ -45,7 +37,7 @@ pub fn find_unreachable_in_block(block: Node) -> Vec<Range> {
     out
 }
 
-fn range_of(node: Node) -> Range {
+pub(crate) fn range_of(node: Node) -> Range {
     let start = node.start_position();
     let end = node.end_position();
     Range {
@@ -53,18 +45,5 @@ fn range_of(node: Node) -> Range {
         start_col: start.column,
         end_line: end.row,
         end_col: end.column,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // Os testes vivem no `forge-lint` porque exigem parse de Python.
-    // Aqui só mantemos helpers puros.
-    #[test]
-    fn terminators_reconhecidos() {
-        // Sem árvore, não testamos `is_terminator` diretamente. O
-        // comportamento é coberto pelos testes de FOR011.
     }
 }

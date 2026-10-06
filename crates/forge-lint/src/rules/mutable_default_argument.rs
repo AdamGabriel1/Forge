@@ -1,6 +1,7 @@
 use crate::util::{range_of, walk};
 use crate::Context;
 use crate::Rule;
+use forge_core::Config;
 use forge_core::{Diagnostic, Edit, Severity};
 use tree_sitter::Node;
 
@@ -253,12 +254,8 @@ class A:
     fn run_fix(source: &str) -> Vec<Edit> {
         let mut parser = forge_parser::get_parser();
         let tree = forge_parser::parse_python_source(&mut parser, source).unwrap();
-        let cfg = Config::default();
-        let ctx = Context {
-            source,
-            filepath: "<test>",
-            config: &cfg,
-        };
+        let cfg = forge_core::Config::default();
+        let ctx = crate::Context::new(source, "<test>", &cfg, tree.root_node());
         let diags = MutableDefaultArgument.check(tree.root_node(), &ctx);
         MutableDefaultArgument.fix(tree.root_node(), &ctx, &diags)
     }

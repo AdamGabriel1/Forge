@@ -20,7 +20,7 @@ impl Rule for UnusedVariable {
         "Remova a variável, use `_` para descartar, ou prefixe com `_` se for intencional."
     }
 
-    fn check(&self, node: Node, ctx: &Context) -> Vec<Diagnostic> {
+    fn check(&self, _node: Node, ctx: &Context) -> Vec<Diagnostic> {
         let model = ctx.semantic();
         let mut diagnostics = Vec::new();
 

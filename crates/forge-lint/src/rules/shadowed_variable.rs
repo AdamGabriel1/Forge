@@ -20,7 +20,7 @@ impl Rule for ShadowedVariable {
         "Renomeie a variável interna para deixar claro que não é a mesma do escopo externo."
     }
 
-    fn check(&self, node: Node, ctx: &Context) -> Vec<Diagnostic> {
+    fn check(&self, _node: Node, ctx: &Context) -> Vec<Diagnostic> {
         let model = ctx.semantic();
         let mut diagnostics = Vec::new();
 

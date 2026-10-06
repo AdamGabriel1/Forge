@@ -78,7 +78,6 @@ impl Rule for UnreachableCode {
 mod tests {
     use super::*;
     use crate::util::test_util::lint;
-    use forge_core::Config;
 
     #[test]
     fn codigo_apos_return() {

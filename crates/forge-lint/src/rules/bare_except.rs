@@ -73,7 +73,6 @@ fn is_bare_except(node: Node) -> bool {
 mod tests {
     use super::*;
     use crate::util::test_util::lint;
-    use forge_core::Config;
 
     #[test]
     fn detecta_bare_except() {

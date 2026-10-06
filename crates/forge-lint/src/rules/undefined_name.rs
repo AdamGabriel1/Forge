@@ -1,7 +1,6 @@
 use crate::Context;
 use crate::Rule;
 use forge_core::{Diagnostic, Severity};
-use forge_semantic::SemanticModel;
 use tree_sitter::Node;
 
 pub struct UndefinedName;
@@ -20,7 +19,7 @@ impl Rule for UndefinedName {
         "Verifique se há um import faltando, um typo, ou uma variável que esqueceu de definir."
     }
 
-    fn check(&self, node: Node, ctx: &Context) -> Vec<Diagnostic> {
+    fn check(&self, _node: Node, ctx: &Context) -> Vec<Diagnostic> {
         let model = ctx.semantic();
         let mut diagnostics = Vec::new();
 
@@ -44,15 +43,12 @@ fn is_ignored(name: &str) -> bool {
     if name.is_empty() {
         return true;
     }
-    // Builtins do Python.
     if crate::rules::shadowed_builtin::is_builtin(name) {
         return true;
     }
-    // Dunders implícitos: `__name__`, `__file__`, `__doc__`, etc.
     if name.starts_with("__") && name.ends_with("__") {
         return true;
     }
-    // Convenções.
     if name == "self" || name == "cls" {
         return true;
     }
@@ -198,7 +194,6 @@ def f():
 
     #[test]
     fn atributo_indefinido_nao_reporta() {
-        // `obj.metodo` — só reportamos `obj`, não `metodo`.
         let src = "obj.metodo()\n";
         assert_eq!(lint(&UndefinedName, src).len(), 1);
     }

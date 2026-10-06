@@ -306,14 +306,6 @@ def f():
 
     // ---- fix ----
 
-    fn make_ctx<'a>(source: &'a str, config: &'a forge_core::Config) -> Context<'a> {
-        Context {
-            source,
-            filepath: "<test>",
-            config,
-        }
-    }
-
     fn run_fix(source: &str) -> Vec<Edit> {
         let mut parser = forge_parser::get_parser();
         let tree = forge_parser::parse_python_source(&mut parser, source).unwrap();

@@ -1,0 +1,6 @@
+[lint]
+ignore = ["FOR001"]
+severity = { FOR002 = "error" }
+
+[lint.options.FOR003]
+max-args = 3

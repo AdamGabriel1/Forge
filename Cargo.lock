@@ -147,6 +147,7 @@ dependencies = [
  "forge-parser",
  "serde",
  "serde_json",
+ "tree-sitter",
  "walkdir",
 ]
 

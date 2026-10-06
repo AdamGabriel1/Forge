@@ -5,6 +5,7 @@ use forge_core::{
 };
 use forge_lint::{default_registry, RuleRegistry};
 use forge_parser::{get_parser, parse_python_source};
+use rayon::prelude::*;
 use serde::Serialize;
 use std::io::IsTerminal;
 use std::path::Path;
@@ -125,9 +126,19 @@ fn load_config(path: &Path) -> Config {
     }
 }
 
-/// Coleta os diagnósticos de um único arquivo, já com severidade da config
-/// aplicada mas **sem** `noqa` e **sem** baseline. Quem chama decide se
-/// aplica cada filtro.
+/// Coleta todos os arquivos `.py` sob `path` em ordem determinística
+/// (a que o `WalkDir` retorna, que por sua vez é estável).
+fn collect_python_files(path: &Path) -> Vec<PathBuf> {
+    WalkDir::new(path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "py"))
+        .map(|e| e.into_path())
+        .collect()
+}
+
+/// Coleta os diagnósticos de um único arquivo, com severidade da config
+/// aplicada mas **sem** `noqa` e **sem** baseline.
 fn collect_diagnostics(
     source: &str,
     filepath: &str,
@@ -170,40 +181,54 @@ fn load_baseline(path: &Option<PathBuf>) -> Option<Baseline> {
     }
 }
 
+fn sort_diagnostics(v: &mut [(String, Diagnostic)]) {
+    v.sort_by(|(fa, da), (fb, db)| {
+        fa.cmp(fb)
+            .then(da.range.start_line.cmp(&db.range.start_line))
+            .then(da.range.start_col.cmp(&db.range.start_col))
+            .then(da.code.cmp(&db.code))
+    });
+}
+
 fn run_check(path: PathBuf, strict: bool, format: OutputFormat, baseline_path: Option<PathBuf>) {
     let config = load_config(&path);
     let registry = default_registry();
-    let mut parser = get_parser();
     let baseline = load_baseline(&baseline_path);
 
-    let mut collected: Vec<(String, Diagnostic)> = Vec::new();
+    let files = collect_python_files(&path);
 
-    for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
-        if !entry.path().extension().is_some_and(|ext| ext == "py") {
-            continue;
-        }
-        let filepath = entry.path();
-        let source = match fs::read_to_string(filepath) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Erro ao ler {}: {}", filepath.display(), e);
-                continue;
-            }
-        };
-        let filepath_str = filepath.to_str().unwrap_or("<unknown>");
+    // Fase 1 (paralela): cada thread mantém seu próprio parser.
+    let per_file: Vec<(String, Vec<Diagnostic>)> = files
+        .par_iter()
+        .map_init(
+            || get_parser(),
+            |parser, filepath| -> Option<(String, Vec<Diagnostic>)> {
+                let source = match fs::read_to_string(filepath) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("Erro ao ler {}: {}", filepath.display(), e);
+                        return None;
+                    }
+                };
+                let filepath_str = filepath.to_string_lossy().into_owned();
+                let diags = collect_diagnostics(&source, &filepath_str, &config, &registry, parser);
+                let diags = noqa::filter_suppressed(diags, &source);
+                let diags = match &baseline {
+                    Some(b) => b.filter(diags, &filepath_str, &source),
+                    None => diags,
+                };
+                Some((filepath_str, diags))
+            },
+        )
+        .filter_map(|x| x)
+        .collect();
 
-        let diags = collect_diagnostics(&source, filepath_str, &config, &registry, &mut parser);
-        // Primeiro `noqa`, depois baseline.
-        let diags = noqa::filter_suppressed(diags, &source);
-        let diags = match &baseline {
-            Some(b) => b.filter(diags, filepath_str, &source),
-            None => diags,
-        };
-
-        for d in diags {
-            collected.push((filepath_str.to_string(), d));
-        }
-    }
+    // Fase 2 (serial): achata e ordena para saída determinística.
+    let mut collected: Vec<(String, Diagnostic)> = per_file
+        .into_iter()
+        .flat_map(|(f, ds)| ds.into_iter().map(move |d| (f.clone(), d)))
+        .collect();
+    sort_diagnostics(&mut collected);
 
     let has_error = collected
         .iter()
@@ -252,30 +277,37 @@ fn run_check(path: PathBuf, strict: bool, format: OutputFormat, baseline_path: O
 fn run_baseline(path: PathBuf, output: PathBuf) {
     let config = load_config(&path);
     let registry = default_registry();
-    let mut parser = get_parser();
 
-    let mut entries = Vec::new();
+    let files = collect_python_files(&path);
 
-    for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
-        if !entry.path().extension().is_some_and(|ext| ext == "py") {
-            continue;
-        }
-        let filepath = entry.path();
-        let source = match fs::read_to_string(filepath) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Erro ao ler {}: {}", filepath.display(), e);
-                continue;
-            }
-        };
-        let filepath_str = filepath.to_str().unwrap_or("<unknown>");
+    let per_file: Vec<Vec<forge_core::baseline::BaselineEntry>> = files
+        .par_iter()
+        .map_init(
+            || get_parser(),
+            |parser, filepath| {
+                let source = match fs::read_to_string(filepath) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("Erro ao ler {}: {}", filepath.display(), e);
+                        return Vec::new();
+                    }
+                };
+                let filepath_str = filepath.to_string_lossy().into_owned();
+                let diags = collect_diagnostics(&source, &filepath_str, &config, &registry, parser);
+                let diags = noqa::filter_suppressed(diags, &source);
+                build_from(&diags, &filepath_str, &source)
+            },
+        )
+        .collect();
 
-        // Baseline reflete o que o `check` mostraria **sem** baseline,
-        // mas **com** `noqa` aplicado — arquivos `# noqa` não entram.
-        let diags = collect_diagnostics(&source, filepath_str, &config, &registry, &mut parser);
-        let diags = noqa::filter_suppressed(diags, &source);
-        entries.extend(build_from(&diags, filepath_str, &source));
-    }
+    let mut entries: Vec<forge_core::baseline::BaselineEntry> =
+        per_file.into_iter().flatten().collect();
+    entries.sort_by(|a, b| {
+        a.file
+            .cmp(&b.file)
+            .then(a.line_content.cmp(&b.line_content))
+            .then(a.code.cmp(&b.code))
+    });
 
     let baseline = Baseline { entries };
     if let Err(e) = baseline.save(&output) {
@@ -292,70 +324,76 @@ fn run_baseline(path: PathBuf, output: PathBuf) {
 fn run_fix(path: PathBuf, dry_run: bool, check: bool) {
     let config = load_config(&path);
     let registry = default_registry();
-    let mut parser = get_parser();
+
+    let files = collect_python_files(&path);
+
+    // Fase 1 (paralela): calcula os edits por arquivo, sem escrever.
+    let per_file: Vec<(String, usize, String)> = files
+        .par_iter()
+        .map_init(
+            || get_parser(),
+            |parser, filepath| -> Option<(String, usize, String)> {
+                let source = match fs::read_to_string(filepath) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("Erro ao ler {}: {}", filepath.display(), e);
+                        return None;
+                    }
+                };
+                let tree = parse_python_source(parser, &source)?;
+                let filepath_str = filepath.to_string_lossy().into_owned();
+                let ctx = Context {
+                    source: &source,
+                    filepath: &filepath_str,
+                    config: &config,
+                };
+                let mut edits = Vec::new();
+                for rule in registry.all() {
+                    if !config.lint.is_enabled(rule.code()) {
+                        continue;
+                    }
+                    let diags = rule.check(tree.root_node(), &ctx);
+                    if diags.is_empty() {
+                        continue;
+                    }
+                    edits.extend(rule.fix(tree.root_node(), &ctx, &diags));
+                }
+                if edits.is_empty() {
+                    return None;
+                }
+                let n = edits.len();
+                let novo = apply_edits(&source, edits);
+                Some((filepath_str, n, novo))
+            },
+        )
+        .filter_map(|x| x)
+        .collect();
+
+    // Fase 2 (serial): ordena, escreve e imprime.
+    let mut per_file = per_file;
+    per_file.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut total_edits = 0usize;
     let mut files_changed = 0usize;
 
-    for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
-        if !entry.path().extension().is_some_and(|ext| ext == "py") {
-            continue;
-        }
-        let filepath = entry.path();
-        let source = match fs::read_to_string(filepath) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Erro ao ler {}: {}", filepath.display(), e);
-                continue;
-            }
-        };
-        let tree = match parse_python_source(&mut parser, &source) {
-            Some(t) => t,
-            None => continue,
-        };
-        let ctx = Context {
-            source: &source,
-            filepath: filepath.to_str().unwrap_or("<unknown>"),
-            config: &config,
-        };
-
-        let mut edits = Vec::new();
-        for rule in registry.all() {
-            if !config.lint.is_enabled(rule.code()) {
-                continue;
-            }
-            let diags = rule.check(tree.root_node(), &ctx);
-            if diags.is_empty() {
-                continue;
-            }
-            edits.extend(rule.fix(tree.root_node(), &ctx, &diags));
-        }
-
-        if edits.is_empty() {
-            continue;
-        }
-
-        let n_edits = edits.len();
+    for (filepath_str, n_edits, novo) in per_file {
         total_edits += n_edits;
         files_changed += 1;
 
         if check {
-            println!("{}: {} correção(ões) disponível(is)", ctx.filepath, n_edits);
+            println!("{}: {} correção(ões) disponível(is)", filepath_str, n_edits);
             continue;
         }
-
-        let novo = apply_edits(&source, edits);
         if dry_run {
-            println!("--- {} (dry-run) ---", ctx.filepath);
+            println!("--- {} (dry-run) ---", filepath_str);
             println!("{}", novo);
             continue;
         }
-
-        if let Err(e) = fs::write(filepath, &novo) {
-            eprintln!("Erro ao escrever {}: {}", filepath.display(), e);
+        if let Err(e) = fs::write(&filepath_str, &novo) {
+            eprintln!("Erro ao escrever {}: {}", filepath_str, e);
             continue;
         }
-        println!("{}: {} correção(ões) aplicada(s)", ctx.filepath, n_edits);
+        println!("{}: {} correção(ões) aplicada(s)", filepath_str, n_edits);
     }
 
     if check && files_changed > 0 {

@@ -10,7 +10,7 @@ use rules::*;
 // Trait Rule + Registry
 // ---------------------------------------------------------------------------
 
-pub trait Rule {
+pub trait Rule: Send + Sync {
     fn code(&self) -> &str;
     fn name(&self) -> &str;
     fn description(&self) -> &str;

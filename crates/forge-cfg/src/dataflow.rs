@@ -20,8 +20,6 @@ pub trait Analysis {
     fn initial(&self) -> Self::State;
 
     /// Processa um único nó e retorna o estado de saída.
-    ///
-    /// A análise pode emitir diagnósticos em `diags`.
     fn transfer<'tree>(
         &self,
         node: Node<'tree>,
@@ -31,8 +29,6 @@ pub trait Analysis {
 
     /// Refina o estado dado um teste de condição. `positive = true` significa
     /// que estamos no ramo "condição verdadeira"; `false` significa o `else`.
-    ///
-    /// Default: não refina (retorna o estado original).
     fn refine<'tree>(
         &self,
         _cond: Node<'tree>,
@@ -53,6 +49,10 @@ pub fn run_block<'tree, A: Analysis>(
     analysis: &A,
     diags: &mut Vec<Diagnostic>,
 ) -> A::State {
+    // Alguns wrappers vêm com o `block` dentro (else_clause, finally_clause).
+    // Desembrulhamos para que os statements internos sejam vistos.
+    let body = unwrap_body(body);
+
     let mut cursor = body.walk();
     let stmts: Vec<Node<'tree>> = body
         .children(&mut cursor)
@@ -64,9 +64,13 @@ pub fn run_block<'tree, A: Analysis>(
     for stmt in stmts {
         match stmt.kind() {
             "if_statement" => {
-                let cond = stmt.child_by_field_name("condition").unwrap();
-                let then_body = stmt.child_by_field_name("consequence").unwrap();
-                let else_body = stmt.child_by_field_name("alternative");
+                let Some(cond) = stmt.child_by_field_name("condition") else {
+                    continue;
+                };
+                let Some(cons) = stmt.child_by_field_name("consequence") else {
+                    continue;
+                };
+                let alt = stmt.child_by_field_name("alternative");
 
                 // A condição em si pode desreferenciar variáveis.
                 current = analysis.transfer(cond, &current, diags);
@@ -75,9 +79,9 @@ pub fn run_block<'tree, A: Analysis>(
                 let s_else_in = analysis.refine(cond, &current, false);
 
                 let mut d_then = Vec::new();
-                let s_then_out = run_block(then_body, s_then_in, analysis, &mut d_then);
+                let s_then_out = run_block(cons, s_then_in, analysis, &mut d_then);
 
-                let (s_else_out, d_else) = match else_body {
+                let (s_else_out, d_else) = match alt {
                     Some(eb) => {
                         let mut d = Vec::new();
                         let s = run_block(eb, s_else_in, analysis, &mut d);
@@ -86,7 +90,6 @@ pub fn run_block<'tree, A: Analysis>(
                     None => (s_else_in, Vec::new()),
                 };
 
-                // Emitir os diagnósticos dos dois ramos.
                 diags.extend(d_then);
                 diags.extend(d_else);
 
@@ -94,35 +97,30 @@ pub fn run_block<'tree, A: Analysis>(
             }
 
             "while_statement" | "for_statement" => {
-                let body_node = stmt.child_by_field_name("body").unwrap();
+                let Some(body_node) = stmt.child_by_field_name("body") else {
+                    continue;
+                };
                 let cond = stmt.child_by_field_name("condition");
                 let iter = stmt.child_by_field_name("right");
 
-                // A expressão do loop em si.
                 if let Some(expr) = cond.or(iter) {
                     current = analysis.transfer(expr, &current, diags);
                 }
 
-                // Estado dentro do loop: refina pela condição (positiva).
                 let loop_in = if let Some(c) = cond {
                     analysis.refine(c, &current, true)
                 } else {
                     current.clone()
                 };
 
-                // Uma passada no corpo. Uma análise completa faria ponto fixo;
-                // uma única passada é conservadora o suficiente para o
-                // primeiro consumidor (nullable).
                 let mut d_body = Vec::new();
                 let body_out = run_block(body_node, loop_in.clone(), analysis, &mut d_body);
                 diags.extend(d_body);
 
-                // Depois do loop: merge entre "nunca entrou" e "saiu do corpo".
                 current = analysis.merge(&current, &body_out);
             }
 
             "return_statement" | "raise_statement" => {
-                // Processa a expressão (se houver) e encerra o bloco.
                 let mut cursor = stmt.walk();
                 for child in stmt.children(&mut cursor) {
                     if child.is_named() {
@@ -136,6 +134,13 @@ pub fn run_block<'tree, A: Analysis>(
                 return current;
             }
 
+            // Blocos aninhados (else_clause, finally_clause wrappers,
+            // try/except/with) — processa como novo bloco.
+            "block" | "else_clause" | "finally_clause" | "except_clause" | "with_statement"
+            | "try_statement" => {
+                current = run_block(stmt, current, analysis, diags);
+            }
+
             _ => {
                 current = analysis.transfer(stmt, &current, diags);
             }
@@ -143,4 +148,19 @@ pub fn run_block<'tree, A: Analysis>(
     }
 
     current
+}
+
+/// Se `node` é um wrapper (else_clause, finally_clause, etc.) que contém
+/// um `block`, retorna o `block`. Caso contrário, retorna `node`.
+fn unwrap_body(node: Node) -> Node {
+    if node.kind() == "block" {
+        return node;
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "block" {
+            return child;
+        }
+    }
+    node
 }

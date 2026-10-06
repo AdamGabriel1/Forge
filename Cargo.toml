@@ -4,6 +4,7 @@ members = [
     "crates/forge-parser",
     "crates/forge-semantic",
     "crates/forge-cfg",
+    "crates/forge-format",
     "crates/forge-lint",
     "crates/forge-cli",
 ]

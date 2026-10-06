@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use forge_core::{
     apply_edits, baseline::build_from, baseline::Baseline, noqa, Config, Diagnostic, Severity,
 };
+use forge_format::format_source;
 use forge_lint::{default_registry, Context, RuleRegistry};
 use forge_parser::{get_parser, parse_python_source};
 use rayon::prelude::*;
@@ -13,7 +14,7 @@ use walkdir::WalkDir;
 
 #[derive(Parser)]
 #[command(name = "forge")]
-#[command(author = "Você")]
+#[command(author = "Adam")]
 #[command(version = "0.1.0")]
 #[command(about = "Linter e Formatter para Python", long_about = None)]
 struct Cli {
@@ -42,9 +43,11 @@ enum Commands {
         #[arg(long)]
         baseline: Option<PathBuf>,
     },
-    /// Formata o código (ainda não implementado)
+    /// Formata o código
     Fmt {
         path: PathBuf,
+        /// Não escreve no disco; sai com código 1 se algum arquivo
+        /// precisa ser formatado. Útil em CI.
         #[arg(long)]
         check: bool,
     },
@@ -95,7 +98,7 @@ fn main() {
             format,
             baseline,
         } => run_check(path, strict, format, baseline),
-        Commands::Fmt { path: _, check: _ } => println!("Formatter ainda não implementado."),
+        Commands::Fmt { path, check } => run_fmt(path, check),
         Commands::Fix {
             path,
             dry_run,
@@ -265,6 +268,62 @@ fn run_check(path: PathBuf, strict: bool, format: OutputFormat, baseline_path: O
 
     if has_error || (strict && has_warning) {
         process::exit(1);
+    }
+}
+
+fn run_fmt(path: PathBuf, check: bool) {
+    let files = collect_python_files(&path);
+
+    // Fase 1 (paralela): formata cada arquivo em memória.
+    let per_file: Vec<(String, String)> = files
+        .par_iter()
+        .filter_map(|filepath| {
+            let source = match fs::read_to_string(filepath) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Erro ao ler {}: {}", filepath.display(), e);
+                    return None;
+                }
+            };
+            let formatted = match format_source(&source) {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("Erro ao parsear {}: {}", filepath.display(), e);
+                    return None;
+                }
+            };
+            if formatted == source {
+                return None;
+            }
+            Some((filepath.to_string_lossy().into_owned(), formatted))
+        })
+        .collect();
+
+    // Fase 2 (serial): ordena, escreve e imprime.
+    let mut per_file = per_file;
+    per_file.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let mut changed = 0usize;
+    for (filepath_str, formatted) in per_file {
+        changed += 1;
+        if check {
+            println!("{}: precisa formatar", filepath_str);
+            continue;
+        }
+        if let Err(e) = fs::write(&filepath_str, &formatted) {
+            eprintln!("Erro ao escrever {}: {}", filepath_str, e);
+            continue;
+        }
+        println!("{}: formatado", filepath_str);
+    }
+
+    if check && changed > 0 {
+        process::exit(1);
+    }
+    if changed == 0 {
+        println!("Tudo formatado.");
+    } else if !check {
+        println!("Resumo: {} arquivo(s) formatado(s).", changed);
     }
 }
 

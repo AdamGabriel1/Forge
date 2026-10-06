@@ -1,0 +1,9 @@
+[package]
+name = "forge-format"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+forge-core = { path = "../forge-core" }
+forge-parser = { path = "../forge-parser" }
+tree-sitter = { workspace = true }

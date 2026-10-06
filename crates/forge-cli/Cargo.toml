@@ -11,6 +11,7 @@ path = "src/main.rs"
 forge-core = { path = "../forge-core" }
 forge-parser = { path = "../forge-parser" }
 forge-lint = { path = "../forge-lint" }
+forge-format = { path = "../forge-format" }
 clap = { workspace = true }
 walkdir = "2.5"
 serde = { workspace = true }

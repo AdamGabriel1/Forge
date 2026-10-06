@@ -7,6 +7,7 @@ use forge_lint::{default_registry, Context, RuleRegistry};
 use forge_parser::{get_parser, parse_python_source};
 use rayon::prelude::*;
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::io::IsTerminal;
 use std::path::Path;
 use std::{fs, path::PathBuf, process};
@@ -28,6 +29,13 @@ enum OutputFormat {
     Json,
 }
 
+#[derive(Clone, Copy, ValueEnum)]
+enum SummaryMode {
+    None,
+    ByRule,
+    ByFile,
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Roda o linter nos arquivos/diretórios
@@ -42,6 +50,9 @@ enum Commands {
         /// Silencia diagnósticos que já estão neste baseline (JSON).
         #[arg(long)]
         baseline: Option<PathBuf>,
+        /// Agrupa a saída por regra ou arquivo em vez de listar tudo.
+        #[arg(long, value_enum, default_value_t = SummaryMode::None)]
+        summary: SummaryMode,
     },
     /// Formata o código
     Fmt {
@@ -97,7 +108,8 @@ fn main() {
             strict,
             format,
             baseline,
-        } => run_check(path, strict, format, baseline),
+            summary,
+        } => run_check(path, strict, format, baseline, summary),
         Commands::Fmt { path, check } => run_fmt(path, check),
         Commands::Fix {
             path,
@@ -138,8 +150,6 @@ fn collect_python_files(path: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-/// Coleta os diagnósticos de um único arquivo, com severidade da config
-/// aplicada mas **sem** `noqa` e **sem** baseline.
 fn collect_diagnostics(
     source: &str,
     filepath: &str,
@@ -187,14 +197,19 @@ fn sort_diagnostics(v: &mut [(String, Diagnostic)]) {
     });
 }
 
-fn run_check(path: PathBuf, strict: bool, format: OutputFormat, baseline_path: Option<PathBuf>) {
+fn run_check(
+    path: PathBuf,
+    strict: bool,
+    format: OutputFormat,
+    baseline_path: Option<PathBuf>,
+    summary: SummaryMode,
+) {
     let config = load_config(&path);
     let registry = default_registry();
     let baseline = load_baseline(&baseline_path);
 
     let files = collect_python_files(&path);
 
-    // Fase 1 (paralela): cada thread mantém seu próprio parser.
     let per_file: Vec<(String, Vec<Diagnostic>)> = files
         .par_iter()
         .map_init(
@@ -220,7 +235,6 @@ fn run_check(path: PathBuf, strict: bool, format: OutputFormat, baseline_path: O
         .filter_map(|x| x)
         .collect();
 
-    // Fase 2 (serial): achata e ordena para saída determinística.
     let mut collected: Vec<(String, Diagnostic)> = per_file
         .into_iter()
         .flat_map(|(f, ds)| ds.into_iter().map(move |d| (f.clone(), d)))
@@ -234,8 +248,8 @@ fn run_check(path: PathBuf, strict: bool, format: OutputFormat, baseline_path: O
         .iter()
         .any(|(_, d)| matches!(d.severity, Severity::Warning));
 
-    match format {
-        OutputFormat::Human => {
+    match (summary, format) {
+        (SummaryMode::None, OutputFormat::Human) => {
             let use_color = std::io::stdout().is_terminal();
             if collected.is_empty() {
                 println!("Nenhum problema encontrado!");
@@ -245,7 +259,7 @@ fn run_check(path: PathBuf, strict: bool, format: OutputFormat, baseline_path: O
                 }
             }
         }
-        OutputFormat::Json => {
+        (SummaryMode::None, OutputFormat::Json) => {
             let arr: Vec<JsonDiagnostic> = collected
                 .iter()
                 .map(|(file, d)| JsonDiagnostic {
@@ -264,6 +278,8 @@ fn run_check(path: PathBuf, strict: bool, format: OutputFormat, baseline_path: O
                 serde_json::to_string_pretty(&arr).unwrap_or_else(|_| "[]".to_string())
             );
         }
+        (SummaryMode::ByRule, _) => print_summary_by_rule(&collected, &registry),
+        (SummaryMode::ByFile, _) => print_summary_by_file(&collected),
     }
 
     if has_error || (strict && has_warning) {
@@ -271,10 +287,62 @@ fn run_check(path: PathBuf, strict: bool, format: OutputFormat, baseline_path: O
     }
 }
 
+fn print_summary_by_rule(collected: &[(String, Diagnostic)], registry: &RuleRegistry) {
+    if collected.is_empty() {
+        println!("Nenhum problema encontrado!");
+        return;
+    }
+    // Ordena por contagem desc, desempate por código.
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for (_, d) in collected {
+        *counts.entry(d.code.clone()).or_insert(0) += 1;
+    }
+    let mut entries: Vec<(String, usize)> = counts.into_iter().collect();
+    entries.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+
+    let width = entries
+        .iter()
+        .map(|(_, n)| n.to_string().len())
+        .max()
+        .unwrap_or(0);
+    let total: usize = entries.iter().map(|(_, n)| n).sum();
+    println!("{total} problema(s):");
+    for (code, n) in entries {
+        let name = registry
+            .find(&code)
+            .map(|r| r.name())
+            .unwrap_or("<desconhecida>");
+        println!("  {n:>width$}  {code}  {name}");
+    }
+}
+
+fn print_summary_by_file(collected: &[(String, Diagnostic)]) {
+    if collected.is_empty() {
+        println!("Nenhum problema encontrado!");
+        return;
+    }
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for (file, _) in collected {
+        *counts.entry(file.clone()).or_insert(0) += 1;
+    }
+    let mut entries: Vec<(String, usize)> = counts.into_iter().collect();
+    entries.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+
+    let width = entries
+        .iter()
+        .map(|(_, n)| n.to_string().len())
+        .max()
+        .unwrap_or(0);
+    let total: usize = entries.iter().map(|(_, n)| n).sum();
+    println!("{total} problema(s) em {} arquivo(s):", entries.len());
+    for (file, n) in entries {
+        println!("  {n:>width$}  {file}");
+    }
+}
+
 fn run_fmt(path: PathBuf, check: bool) {
     let files = collect_python_files(&path);
 
-    // Fase 1 (paralela): formata cada arquivo em memória.
     let per_file: Vec<(String, String)> = files
         .par_iter()
         .filter_map(|filepath| {
@@ -299,7 +367,6 @@ fn run_fmt(path: PathBuf, check: bool) {
         })
         .collect();
 
-    // Fase 2 (serial): ordena, escreve e imprime.
     let mut per_file = per_file;
     per_file.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -377,7 +444,6 @@ fn run_fix(path: PathBuf, dry_run: bool, check: bool) {
 
     let files = collect_python_files(&path);
 
-    // Fase 1 (paralela): calcula os edits por arquivo, sem escrever.
     let per_file: Vec<(String, usize, String)> = files
         .par_iter()
         .map_init(
@@ -415,7 +481,6 @@ fn run_fix(path: PathBuf, dry_run: bool, check: bool) {
         .filter_map(|x| x)
         .collect();
 
-    // Fase 2 (serial): ordena, escreve e imprime.
     let mut per_file = per_file;
     per_file.sort_by(|a, b| a.0.cmp(&b.0));
 

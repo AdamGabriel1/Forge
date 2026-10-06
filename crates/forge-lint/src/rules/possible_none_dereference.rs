@@ -1,8 +1,8 @@
 use crate::util::walk;
 use crate::Rule;
-use forge_cfg::dataflow::run_block;
+use forge_cfg::dataflow::{run_block, Analysis};
 use forge_cfg::nullable::NullableAnalysis;
-use forge_core::{Context, Diagnostic, Severity};
+use forge_core::{Context, Diagnostic};
 use tree_sitter::Node;
 
 pub struct PossibleNoneDereference;
@@ -126,7 +126,6 @@ def f(c):
 
     #[test]
     fn if_else_mistura_reporta() {
-        // Uma branch define None, a outra não → MaybeNone.
         let src = "\
 def f(c):
     x = 5
@@ -139,7 +138,6 @@ def f(c):
 
     #[test]
     fn if_not_none_guarda() {
-        // O `if x is not None:` refina o estado para NotNone dentro do ramo.
         let src = "\
 def f():
     x = None

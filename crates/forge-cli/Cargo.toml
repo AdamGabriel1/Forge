@@ -15,3 +15,4 @@ clap = { workspace = true }
 walkdir = "2.5"
 serde = { workspace = true }
 serde_json = { workspace = true }
+tree-sitter = { workspace = true }

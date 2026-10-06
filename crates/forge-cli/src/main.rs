@@ -201,7 +201,7 @@ fn run_check(path: PathBuf, strict: bool, format: OutputFormat, baseline_path: O
     let per_file: Vec<(String, Vec<Diagnostic>)> = files
         .par_iter()
         .map_init(
-            || get_parser(),
+            get_parser,
             |parser, filepath| -> Option<(String, Vec<Diagnostic>)> {
                 let source = match fs::read_to_string(filepath) {
                     Ok(s) => s,
@@ -282,22 +282,19 @@ fn run_baseline(path: PathBuf, output: PathBuf) {
 
     let per_file: Vec<Vec<forge_core::baseline::BaselineEntry>> = files
         .par_iter()
-        .map_init(
-            || get_parser(),
-            |parser, filepath| {
-                let source = match fs::read_to_string(filepath) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        eprintln!("Erro ao ler {}: {}", filepath.display(), e);
-                        return Vec::new();
-                    }
-                };
-                let filepath_str = filepath.to_string_lossy().into_owned();
-                let diags = collect_diagnostics(&source, &filepath_str, &config, &registry, parser);
-                let diags = noqa::filter_suppressed(diags, &source);
-                build_from(&diags, &filepath_str, &source)
-            },
-        )
+        .map_init(get_parser, |parser, filepath| {
+            let source = match fs::read_to_string(filepath) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Erro ao ler {}: {}", filepath.display(), e);
+                    return Vec::new();
+                }
+            };
+            let filepath_str = filepath.to_string_lossy().into_owned();
+            let diags = collect_diagnostics(&source, &filepath_str, &config, &registry, parser);
+            let diags = noqa::filter_suppressed(diags, &source);
+            build_from(&diags, &filepath_str, &source)
+        })
         .collect();
 
     let mut entries: Vec<forge_core::baseline::BaselineEntry> =
@@ -331,7 +328,7 @@ fn run_fix(path: PathBuf, dry_run: bool, check: bool) {
     let per_file: Vec<(String, usize, String)> = files
         .par_iter()
         .map_init(
-            || get_parser(),
+            get_parser,
             |parser, filepath| -> Option<(String, usize, String)> {
                 let source = match fs::read_to_string(filepath) {
                     Ok(s) => s,

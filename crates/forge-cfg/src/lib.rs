@@ -7,11 +7,13 @@ pub mod constant;
 pub mod dataflow;
 pub mod definite_assignment;
 pub mod nullable;
+pub mod reaching;
 
 pub use constant::{ConstState, ConstValue, ConstantPropagation};
 pub use dataflow::{run_block, Analysis};
 pub use definite_assignment::{collect_locals, AssignState, DefiniteAssignmentAnalysis};
 pub use nullable::{Nullable, NullableAnalysis, NullableState};
+pub use reaching::{DefId, ReachState, ReachingDefinitions};
 
 /// `true` se o nó é uma instrução que encerra o fluxo linear do bloco.
 pub fn is_terminator(node: Node) -> bool {
@@ -22,7 +24,7 @@ pub fn is_terminator(node: Node) -> bool {
 }
 
 /// Retorna os ranges de todas as instruções diretas de um `block` que vêm
-/// **depois** do primeiro terminador. Se não houver terminador, retorna vazio.
+/// **depois** do primeiro terminador.
 pub fn find_unreachable_in_block(block: Node) -> Vec<Range> {
     let mut cursor = block.walk();
     let stmts: Vec<Node> = block

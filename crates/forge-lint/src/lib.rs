@@ -114,5 +114,6 @@ pub fn default_registry() -> RuleRegistry {
     registry.register(Box::new(PossibleNoneDereference));
     registry.register(Box::new(ExpensiveOperationInsideLoop));
     registry.register(Box::new(ConstantCondition));
+    registry.register(Box::new(DeadStore));
     registry
 }

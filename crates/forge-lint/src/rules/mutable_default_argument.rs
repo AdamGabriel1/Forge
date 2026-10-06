@@ -1,7 +1,6 @@
 use crate::util::{range_of, walk};
 use crate::Context;
 use crate::Rule;
-use forge_core::Config;
 use forge_core::{Diagnostic, Edit, Severity};
 use tree_sitter::Node;
 
@@ -55,10 +54,6 @@ impl Rule for MutableDefaultArgument {
     ///    linha** do primeiro statement do corpo. O indent é detectado a
     ///    partir dessa linha, então funciona em funções de módulo (4) e
     ///    em métodos (8).
-    ///
-    /// A inserção no corpo acontece uma vez por parâmetro corrigido,
-    /// empilhando as guardas na ordem da assinatura. Não reformatamos
-    /// indentação — isso é papel do formatter.
     fn fix(&self, node: Node, ctx: &Context, _diagnostics: &[Diagnostic]) -> Vec<Edit> {
         let bytes = ctx.source.as_bytes();
         let mut edits: Vec<Edit> = Vec::new();
@@ -137,10 +132,6 @@ impl Rule for MutableDefaultArgument {
 }
 
 /// Retorna o offset do início da linha do primeiro statement do `block`.
-///
-/// `body.start_byte()` aponta para o primeiro caractere **de conteúdo** do
-/// bloco (não para o começo da linha). Pulamos eventuais `\n` à frente e
-/// voltamos até o começo da linha.
 fn first_body_line_start(body: Node, bytes: &[u8]) -> usize {
     let mut pos = body.start_byte();
     while pos < bytes.len() && bytes[pos] == b'\n' {
@@ -154,7 +145,6 @@ fn first_body_line_start(body: Node, bytes: &[u8]) -> usize {
 }
 
 /// Conta espaços e tabs consecutivos a partir de `line_start`.
-/// Retorna "    " (4 espaços) se a linha começar direto com conteúdo.
 fn detect_indent_at(line_start: usize, bytes: &[u8]) -> String {
     let mut i = line_start;
     while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b'\t') {
@@ -183,7 +173,6 @@ fn is_mutable_default(value: Node, source: &str) -> bool {
 mod tests {
     use super::*;
     use crate::util::test_util::lint;
-    use forge_core::Config;
 
     #[test]
     fn detecta_lista() {

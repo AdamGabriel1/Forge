@@ -15,7 +15,7 @@ impl Rule for UsedBeforeAssignment {
         "used_before_assignment"
     }
     fn description(&self) -> &str {
-        "Uma variável local é lida antes de ser atribuída em todos os caminhos — Python lança `UnboundLocalError` em runtime."
+        "Uma variável local pode ser lida antes de receber um valor em algum caminho — Python lança `UnboundLocalError`."
     }
     fn fix_hint(&self) -> &str {
         "Mova a atribuição para antes do uso, ou atribua um valor inicial."
@@ -109,16 +109,70 @@ def f():
         assert_eq!(lint(&UsedBeforeAssignment, src).len(), 2);
     }
 
+    // ---- loops (fixed-point) ----
+
     #[test]
-    fn uso_depois_de_loop_ok() {
+    fn target_usado_dentro_do_loop_ok() {
         let src = "\
 def f():
     for i in range(10):
+        print(i)
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
+    }
+
+    #[test]
+    fn uso_de_target_apos_for_reporta() {
+        // Se items for vazio, `i` não existe depois do loop.
+        // Reportamos porque o data-flow ficou mais preciso com o
+        // ponto fixo: `state_after_expr` ainda tem `i` ausente, e o
+        // merge de saída preserva essa possibilidade.
+        let src = "\
+def f(items):
+    for i in items:
+        pass
+    print(i)
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
+    }
+
+    #[test]
+    fn uso_apos_for_com_default_ok() {
+        // Se declararmos `i = None` antes, fica claro que o autor
+        // sabe que o loop pode não executar.
+        let src = "\
+def f(items):
+    i = None
+    for i in items:
         pass
     print(i)
 ";
         assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
     }
+
+    #[test]
+    fn while_body_reatribui_target_reporta() {
+        let src = "\
+def f():
+    while True:
+        print(x)
+        x = 1
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
+    }
+
+    #[test]
+    fn loop_emite_diag_uma_vez() {
+        let src = "\
+def f(items):
+    for i in items:
+        print(y)
+        y = 1
+";
+        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
+    }
+
+    // ---- sensíveis a caminho ----
 
     #[test]
     fn if_sem_else_apenas_then_atribui_reporta() {
@@ -200,51 +254,6 @@ def f():
     y = x
     x = 1
     return y
-";
-        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
-    }
-
-    // ---- loops (fixed-point) ----
-
-    #[test]
-    fn for_loop_target_nao_reporta() {
-        let src = "\
-def f(items):
-    for i in items:
-        print(i)
-";
-        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 0);
-    }
-
-    #[test]
-    fn uso_de_target_apos_for_reporta() {
-        let src = "\
-def f(items):
-    for i in items:
-        pass
-    print(i)
-";
-        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
-    }
-
-    #[test]
-    fn while_body_reatribui_target_reporta() {
-        let src = "\
-def f():
-    while True:
-        print(x)
-        x = 1
-";
-        assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
-    }
-
-    #[test]
-    fn loop_emite_diag_uma_vez() {
-        let src = "\
-def f(items):
-    for i in items:
-        print(y)
-        y = 1
 ";
         assert_eq!(lint(&UsedBeforeAssignment, src).len(), 1);
     }

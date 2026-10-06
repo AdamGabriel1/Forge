@@ -105,7 +105,7 @@ impl<'src> DefiniteAssignmentAnalysis<'src> {
                 diags.push(Diagnostic::new(
                     "FOR012",
                     &format!(
-                        "`{}` é usado antes de ser atribuído em todos os caminhos — `UnboundLocalError`.",
+                        "`{}` pode ser usada antes de receber um valor — `UnboundLocalError` em runtime.",
                         name
                     ),
                     range_of(node),

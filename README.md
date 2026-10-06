@@ -7,14 +7,16 @@ Rust sobre [tree-sitter](https://tree-sitter.github.io/tree-sitter/).
 
 O Forge combina três coisas que normalmente vivem em ferramentas separadas:
 
-- **Lint** com 14 regras, incluindo análise de fluxo (nullable, definite
-  assignment) sensível a caminho de execução.
+- **Lint** com 16 regras, incluindo análise de fluxo sensível a caminho
+  (nullable, definite assignment, constant propagation, reaching
+  definitions) com iteração até ponto fixo em loops.
 - **Formatter** opinativo, idempotente, preservando strings e comentários.
 - **Baseline** para adoção incremental em projetos legados: você gera um
   snapshot dos problemas existentes e passa a enxergar só o que é novo.
 
-> ⚠️ **Projeto em desenvolvimento.** O formatter cobre espaçamento e
-> indentação, mas ainda não quebra linhas longas nem reformata docstrings.
+> ⚠️ **Projeto em desenvolvimento.** O formatter cobre espaçamento,
+> indentação e continuations, mas ainda não quebra linhas longas nem
+> reformata docstrings.
 
 ---
 
@@ -42,9 +44,11 @@ Roda o linter em arquivos ou diretórios.
 ```bash
 forge check src/
 forge check main.py
-forge check . --strict                 # warnings contam como erro
-forge check . --format json            # saída em JSON
+forge check . --strict                       # warnings contam como erro
+forge check . --format json                  # saída em JSON
 forge check . --baseline forge-baseline.json
+forge check . --summary by-rule              # agrupa por código de regra
+forge check . --summary by-file              # agrupa por arquivo
 ```
 
 **Exit codes:**
@@ -78,6 +82,7 @@ Formata código Python. Idempotente, preserva strings e comentários.
 ```bash
 forge fmt src/                # escreve no disco
 forge fmt src/ --check        # sai com 1 se algum arquivo precisa
+forge fmt src/ --diff         # mostra diff unificado, não escreve
 ```
 
 Regras implementadas:
@@ -88,7 +93,9 @@ Regras implementadas:
   antes de `.`/`(`/`[`, sem espaço antes de `:` de cabeçalho de bloco
 - **Colons contextuais**: `{1: 2}` (dict), `def f(x: int)` (anotação),
   `a[1:2]` (slice sem espaço)
-- **Indentação**: normaliza para 4 espaços por nível de bloco
+- **Indentação de bloco**: normaliza para 4 espaços por nível
+- **Continuations multi-linha**: indentação dentro de `()`/`[]`/`{}`
+  normalizada para `base + 4 * profundidade`, fechadores alinhados
 - **Decoradores**: `@app.route` colado ao nome
 
 ### `forge baseline`
@@ -133,22 +140,24 @@ except:  # noqa
 
 ## Regras
 
-| Código  | Nome                              | Descrição                                                      |
-|---------|-----------------------------------|----------------------------------------------------------------|
+| Código  | Nome                              | Descrição                                                       |
+|---------|-----------------------------------|-----------------------------------------------------------------|
 | FOR001  | `bare_except`                     | `except:` sem exceção captura `SystemExit` e `KeyboardInterrupt`. |
 | FOR002  | `mutable_default_argument`        | `def f(x=[])` — default mutável é compartilhado entre chamadas. |
-| FOR003  | `too_many_arguments`              | Função com muitos parâmetros é difícil de testar e evoluir.    |
-| FOR004  | `function_too_long`               | Funções muito longas dificultam a leitura.                    |
-| FOR005  | `shadowed_builtin`                | `list = []` sobrescreve um builtin.                            |
-| FOR006  | `unused_import`                   | Import que nunca é usado.                                     |
-| FOR007  | `unused_variable`                 | Variável atribuída mas nunca lida.                            |
-| FOR008  | `shadowed_variable`               | Variável local com mesmo nome de uma externa.                 |
-| FOR009  | `redefined_function`              | Duas `def` com o mesmo nome no mesmo escopo.                  |
-| FOR010  | `undefined_name`                  | Nome usado mas nunca definido, importado ou builtin.          |
-| FOR011  | `unreachable_code`                | Código depois de `return`/`raise`/`break`/`continue`.          |
-| FOR012  | `used_before_assignment`          | Variável local lida antes de ser atribuída.                   |
-| FOR013  | `possible_none_dereference`       | `x = None; x.foo()` sem checagem intermediária.               |
-| FOR014  | `expensive_operation_inside_loop` | `sorted()`, `reversed()`, `.sort()`, comprehensions dentro de loops. |
+| FOR003  | `too_many_arguments`              | Função com muitos parâmetros é difícil de testar e evoluir.     |
+| FOR004  | `function_too_long`               | Funções muito longas dificultam a leitura.                      |
+| FOR005  | `shadowed_builtin`                | `list = []` sobrescreve um builtin.                             |
+| FOR006  | `unused_import`                   | Import que nunca é usado.                                       |
+| FOR007  | `unused_variable`                 | Variável atribuída mas nunca lida.                              |
+| FOR008  | `shadowed_variable`               | Variável local com mesmo nome de uma externa.                   |
+| FOR009  | `redefined_function`              | Duas `def` com o mesmo nome no mesmo escopo.                    |
+| FOR010  | `undefined_name`                  | Nome usado mas nunca definido, importado ou builtin.            |
+| FOR011  | `unreachable_code`                | Código depois de `return`/`raise`/`break`/`continue`.           |
+| FOR012  | `used_before_assignment`          | Variável local pode ser lida antes de receber valor.            |
+| FOR013  | `possible_none_dereference`       | `x = None; x.foo()` sem checagem intermediária.                 |
+| FOR014  | `expensive_operation_inside_loop` | `sorted()`, `.sort()`, comprehensions dentro de loops.          |
+| FOR015  | `constant_condition`              | Condição de `if`/`while` sempre avalia para `True`/`False`.     |
+| FOR016  | `dead_store`                      | Atribuição cujo valor nunca é lido.                             |
 
 ---
 
@@ -187,9 +196,9 @@ crates/
 ├── forge-core       # Diagnostic, Severity, Range, Edit, Config, noqa, baseline
 ├── forge-parser     # wrapper sobre tree-sitter-python
 ├── forge-semantic   # escopos, bindings, uses, resolução de nomes
-├── forge-cfg        # data-flow engine: Analysis trait, Nullable, DefiniteAssignment
-├── forge-format     # formatter
-├── forge-lint       # trait Rule, RuleRegistry, as 14 regras
+├── forge-cfg        # data-flow engine: Analysis trait + 4 análises
+├── forge-format     # formatter (gaps, indentação, continuations)
+├── forge-lint       # trait Rule, RuleRegistry, 16 regras
 └── forge-cli        # binário `forge` (check, fix, fmt, baseline, explain)
 ```
 
@@ -205,21 +214,29 @@ pub trait Analysis {
     fn transfer(&self, node: Node, state: &State, diags: &mut Vec<Diagnostic>) -> State;
     fn refine(&self, cond: Node, state: &State, positive: bool) -> State;
     fn merge(&self, a: &State, b: &State) -> State;
+    fn bind_loop_target(&self, target: Node, state: &State) -> State { ... }
+    fn observe_condition(&self, cond: Node, state: &State, diags: &mut Vec<Diagnostic>) { }
 }
 ```
 
-Duas análises já implementadas:
+O walker recursivo (`run_block`) faz:
+
+- **`if/else`**: dois ramos independentes que fazem merge no ponto de
+  junção, com `refine` aplicado à condição em cada lado.
+- **`while`/`for`**: iteração até **ponto fixo**. O estado no loop head
+  é recomputado até `new_head == loop_head` (com teto de 64 iterações
+  como garantia de terminação). Diagnósticos são emitidos apenas da
+  última iteração, evitando duplicação.
+
+Quatro análises já implementadas:
 
 - **`NullableAnalysis`** — rastreia se uma variável pode ser `None` (FOR013).
-- **`DefiniteAssignmentAnalysis`** — rastreia se uma variável foi atribuída em
-  todos os caminhos até um ponto (FOR012).
-
-O walker recursivo faz merge em `if/else` e uma aproximação conservadora em
-loops. `if x is not None:` refina o estado do ramo positivo para `NotNone`.
-
-Esse modelo é suficiente para análises sensíveis a caminho como nullable e
-definite assignment. Quando quisermos `constant propagation` de verdade,
-migramos para um CFG materializado — o trait sobrevive.
+- **`DefiniteAssignmentAnalysis`** — rastreia se uma variável foi atribuída
+  em todos os caminhos até um ponto (FOR012).
+- **`ConstantPropagation`** — propaga constantes (`int`, `str`, `bool`,
+  `None`) por expressões aritméticas, comparações e booleanos (FOR015).
+- **`ReachingDefinitions`** — rastreia definições ativas e detecta dead
+  stores, sem duplicar com FOR007 (FOR016).
 
 ---
 
@@ -229,7 +246,7 @@ migramos para um CFG materializado — o trait sobrevive.
 # Build
 cargo build
 
-# Testes (251 no total)
+# Testes (296 no total)
 cargo test --all
 
 # Só um crate
@@ -251,12 +268,12 @@ exatamente esses comandos mais `cargo test --all`.
 
 Medido em Codespaces (2 vCPU), 200 arquivos × 1100 linhas = 220k linhas:
 
-| Modo                  | Tempo  |
-|-----------------------|--------|
+| Modo                          | Tempo  |
+|-------------------------------|--------|
 | Serial (`RAYON_NUM_THREADS=1`) | ~4.4s  |
-| Paralelo (default)             | ~3.1s  |
+| Paralelo (default)            | ~3.1s  |
 
-O `check`, `fix`, `baseline` e `fmt` rodam em paralelo por arquivo via
+`check`, `fix`, `baseline` e `fmt` rodam em paralelo por arquivo via
 `rayon`. Cada thread mantém seu próprio `tree-sitter::Parser` (não é
 `Sync`).
 
@@ -264,14 +281,19 @@ O `check`, `fix`, `baseline` e `fmt` rodam em paralelo por arquivo via
 
 ## Limitações conhecidas
 
-- **FOR013** e **FOR012** aproximam loops sem ponto fixo: uma única passada
-  pelo corpo é o suficiente para os casos comuns, mas em casos raros com
-  invariantes complexas pode gerar falso positivo ou negativo.
+- **FOR012**/**FOR013** aproximam loops com ponto fixo, mas o teto de 64
+  iterações pode truncar análises teóricas mais longas. Na prática,
+  convergência acontece em poucas iterações para as duas análises atuais.
 - **FOR014** só reconhece `sorted`, `reversed`, `.sort()` e comprehensions.
   Chamadas potencialmente caras a métodos customizados ficam de fora.
-- **`forge fmt`** não quebra linhas longas, não reformata docstrings, e não
-  toca a indentação de continuations dentro de parênteses/colchetes/chaves.
-- **`forge fix`** cobre 4 das 14 regras.
+- **FOR015** não propaga constantes através de argumentos de função nem
+  de atributos (`self.DEBUG = False`).
+- **FOR016** reporta qualquer atribuição cujo valor não foi lido, mas
+  não distingue “dead store garantida” de “dead store em algum caminho”
+  — o output é por definição individual.
+- **`forge fmt`** não quebra linhas longas nem reformata docstrings.
+  Continuations de backslash (`x = 1 + \`) são preservadas.
+- **`forge fix`** cobre 4 das 16 regras.
 
 ---
 

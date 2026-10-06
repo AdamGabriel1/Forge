@@ -147,12 +147,9 @@ fn range_of(node: Node) -> Range {
 
 fn first_child_of_kind<'a>(parent: Node<'a>, kind: &str) -> Option<Node<'a>> {
     let mut cursor = parent.walk();
-    for child in parent.children(&mut cursor) {
-        if child.kind() == kind {
-            return Some(child);
-        }
-    }
-    None
+    parent
+        .children(&mut cursor)
+        .find(|&child| child.kind() == kind)
 }
 
 fn first_segment(node: Node, source: &str) -> String {
@@ -191,13 +188,7 @@ impl Analyzer {
         self.record_binding_named(name, range_of(node), scope, kind);
     }
 
-    fn record_binding_named(
-        &mut self,
-        name: &str,
-        range: Range,
-        scope: usize,
-        kind: BindingKind,
-    ) {
+    fn record_binding_named(&mut self, name: &str, range: Range, scope: usize, kind: BindingKind) {
         self.scopes[scope]
             .bindings
             .entry(name.to_string())
@@ -222,8 +213,11 @@ impl Analyzer {
 
     fn resolve(&mut self) {
         // Itera sobre uma cópia dos índices para evitar borrow conflict.
-        let uses: Vec<(String, usize)> =
-            self.uses.iter().map(|u| (u.name.clone(), u.scope)).collect();
+        let uses: Vec<(String, usize)> = self
+            .uses
+            .iter()
+            .map(|u| (u.name.clone(), u.scope))
+            .collect();
         for (name, scope) in uses {
             let mut current = Some(scope);
             while let Some(sid) = current {
@@ -259,9 +253,7 @@ impl Analyzer {
             "with_item" => self.visit_with_item(node, scope, source),
             "except_clause" => self.visit_except(node, scope, source),
             "named_expression" => self.visit_walrus(node, scope, source),
-            "import_statement" | "import_from_statement" => {
-                self.visit_import(node, scope, source)
-            }
+            "import_statement" | "import_from_statement" => self.visit_import(node, scope, source),
             "list_comprehension"
             | "set_comprehension"
             | "dictionary_comprehension"
@@ -497,12 +489,7 @@ impl Analyzer {
                         }
                         "aliased_import" => {
                             if let Some(alias) = child.child_by_field_name("alias") {
-                                self.record_binding(
-                                    alias,
-                                    scope,
-                                    BindingKind::Import,
-                                    source,
-                                );
+                                self.record_binding(alias, scope, BindingKind::Import, source);
                             }
                         }
                         _ => {}
@@ -532,12 +519,7 @@ impl Analyzer {
                         }
                         "aliased_import" => {
                             if let Some(alias) = child.child_by_field_name("alias") {
-                                self.record_binding(
-                                    alias,
-                                    scope,
-                                    BindingKind::Import,
-                                    source,
-                                );
+                                self.record_binding(alias, scope, BindingKind::Import, source);
                             }
                         }
                         "wildcard_import" => {

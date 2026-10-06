@@ -3,10 +3,12 @@
 use forge_core::Range;
 use tree_sitter::Node;
 
+pub mod constant;
 pub mod dataflow;
 pub mod definite_assignment;
 pub mod nullable;
 
+pub use constant::{ConstState, ConstValue, ConstantPropagation};
 pub use dataflow::{run_block, Analysis};
 pub use definite_assignment::{collect_locals, AssignState, DefiniteAssignmentAnalysis};
 pub use nullable::{Nullable, NullableAnalysis, NullableState};

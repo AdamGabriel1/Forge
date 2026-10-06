@@ -58,6 +58,19 @@ pub trait Analysis {
     fn bind_loop_target<'tree>(&self, _target: Node<'tree>, state: &Self::State) -> Self::State {
         state.clone()
     }
+
+    /// Observa uma condição de `if`/`while` com o estado vigente.
+    /// Usado por análises que emitem diagnósticos sobre a própria
+    /// condição (ex: `ConstantPropagation` → FOR015).
+    ///
+    /// Default: no-op.
+    fn observe_condition<'tree>(
+        &self,
+        _cond: Node<'tree>,
+        _state: &Self::State,
+        _diags: &mut Vec<Diagnostic>,
+    ) {
+    }
 }
 
 /// Roda a análise sobre um bloco (corpo de função ou módulo).
@@ -133,6 +146,8 @@ fn run_if<'tree, A: Analysis>(
     };
     let alt = stmt.child_by_field_name("alternative");
 
+    analysis.observe_condition(cond, &state, diags);
+
     // A condição em si pode desreferenciar variáveis.
     let state_after_cond = analysis.transfer(cond, &state, diags);
 
@@ -169,6 +184,10 @@ fn run_loop<'tree, A: Analysis>(
     let Some(body) = stmt.child_by_field_name("body") else {
         return state_before;
     };
+
+    if let Some(c) = cond {
+        analysis.observe_condition(c, &state_before, diags);
+    }
 
     // Processa a expressão do loop: condição (`while`) ou iterável (`for`).
     let state_after_expr = if let Some(expr) = cond.or(iter) {

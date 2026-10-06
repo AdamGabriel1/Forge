@@ -178,12 +178,7 @@ impl<'src> Analysis for NullableAnalysis<'src> {
         new
     }
 
-    fn refine<'tree>(
-        &self,
-        cond: Node<'tree>,
-        state: &Self::State,
-        positive: bool,
-    ) -> Self::State {
+    fn refine<'tree>(&self, cond: Node<'tree>, state: &Self::State, positive: bool) -> Self::State {
         let mut new = state.clone();
         let bytes = self.src();
 
@@ -268,10 +263,7 @@ fn classify_value(node: Node, bytes: &[u8]) -> Nullable {
 ///
 /// Retorna `(nome, checks_for_none)`. Se `checks_for_none` é `true`, a
 /// condição pergunta se `x` é `None`.
-fn parse_none_check<'tree>(
-    cond: Node<'tree>,
-    bytes: &'tree [u8],
-) -> Option<(&'tree str, bool)> {
+fn parse_none_check<'tree>(cond: Node<'tree>, bytes: &'tree [u8]) -> Option<(&'tree str, bool)> {
     let mut cursor = cond.walk();
     let children: Vec<Node> = cond.children(&mut cursor).collect();
 

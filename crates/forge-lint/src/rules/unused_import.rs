@@ -136,15 +136,10 @@ fn is_only_statement_on_line(node: Node, source: &str) -> bool {
         line_end += 1;
     }
 
-    source[line_start..start_byte].trim().is_empty()
-        && source[end_byte..line_end].trim().is_empty()
+    source[line_start..start_byte].trim().is_empty() && source[end_byte..line_end].trim().is_empty()
 }
 
-fn collect_import_statement<'a>(
-    stmt: Node<'a>,
-    source: &str,
-    out: &mut Vec<(Node<'a>, String)>,
-) {
+fn collect_import_statement<'a>(stmt: Node<'a>, source: &str, out: &mut Vec<(Node<'a>, String)>) {
     let mut cursor = stmt.walk();
     for child in stmt.children(&mut cursor) {
         match child.kind() {
@@ -164,11 +159,7 @@ fn collect_import_statement<'a>(
     }
 }
 
-fn collect_import_from<'a>(
-    stmt: Node<'a>,
-    source: &str,
-    out: &mut Vec<(Node<'a>, String)>,
-) {
+fn collect_import_from<'a>(stmt: Node<'a>, source: &str, out: &mut Vec<(Node<'a>, String)>) {
     let mut seen_module = false;
     let mut cursor = stmt.walk();
     for child in stmt.children(&mut cursor) {

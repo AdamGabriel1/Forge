@@ -1,5 +1,7 @@
 # Forge
 
+[![CI](https://github.com/AdamGabriel1/Forge/actions/workflows/ci.yml/badge.svg)](https://github.com/AdamGabriel1/Forge/actions/workflows/ci.yml)
+
 Linter estático e (futuro) formatter para Python, escrito em Rust.
 
 O Forge analisa código Python com [tree-sitter](https://tree-sitter.github.io/tree-sitter/)

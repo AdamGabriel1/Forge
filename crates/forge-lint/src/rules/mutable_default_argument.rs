@@ -113,11 +113,7 @@ impl Rule for MutableDefaultArgument {
                 if !is_mutable_default(value, ctx.source) {
                     continue;
                 }
-                edits.push(Edit::replace(
-                    value.start_byte(),
-                    value.end_byte(),
-                    "None",
-                ));
+                edits.push(Edit::replace(value.start_byte(), value.end_byte(), "None"));
             }
 
             // 2. Descobre início da linha do primeiro statement do corpo e

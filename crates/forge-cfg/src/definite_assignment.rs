@@ -51,11 +51,7 @@ pub struct DefiniteAssignmentAnalysis<'src> {
 }
 
 impl<'src> DefiniteAssignmentAnalysis<'src> {
-    pub fn new(
-        source: &'src str,
-        locals: HashSet<String>,
-        params: HashSet<String>,
-    ) -> Self {
+    pub fn new(source: &'src str, locals: HashSet<String>, params: HashSet<String>) -> Self {
         Self {
             source,
             locals,
@@ -143,8 +139,11 @@ impl<'src> DefiniteAssignmentAnalysis<'src> {
                     state.set(name, true);
                 }
             }
-            "pattern_list" | "tuple_pattern" | "list_pattern"
-            | "list_splat_pattern" | "dictionary_splat_pattern" => {
+            "pattern_list"
+            | "tuple_pattern"
+            | "list_pattern"
+            | "list_splat_pattern"
+            | "dictionary_splat_pattern" => {
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     if child.is_named() {
@@ -235,10 +234,7 @@ impl<'src> Analysis for DefiniteAssignmentAnalysis<'src> {
 /// (`:=`) no corpo. Não inclui alvos de `for`, `with`, `except` nem
 /// compreensões — fica para uma segunda passada, quando cobrirmos esses
 /// casos no motor.
-pub fn collect_locals(
-    func_def: Node,
-    source: &str,
-) -> (HashSet<String>, HashSet<String>) {
+pub fn collect_locals(func_def: Node, source: &str) -> (HashSet<String>, HashSet<String>) {
     let mut locals = HashSet::new();
     let mut params = HashSet::new();
 
@@ -261,8 +257,11 @@ fn collect_params(params: Node, source: &str, out: &mut HashSet<String>) {
                     out.insert(n.to_string());
                 }
             }
-            "typed_parameter" | "default_parameter" | "typed_default_parameter"
-            | "list_splat_pattern" | "dictionary_splat_pattern" => {
+            "typed_parameter"
+            | "default_parameter"
+            | "typed_default_parameter"
+            | "list_splat_pattern"
+            | "dictionary_splat_pattern" => {
                 let mut c = child.walk();
                 for sub in child.children(&mut c) {
                     if sub.kind() == "identifier" {
@@ -310,8 +309,11 @@ fn collect_target_names(node: Node, source: &str, out: &mut HashSet<String>) {
                 out.insert(n.to_string());
             }
         }
-        "pattern_list" | "tuple_pattern" | "list_pattern"
-        | "list_splat_pattern" | "dictionary_splat_pattern" => {
+        "pattern_list"
+        | "tuple_pattern"
+        | "list_pattern"
+        | "list_splat_pattern"
+        | "dictionary_splat_pattern" => {
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 if child.is_named() {

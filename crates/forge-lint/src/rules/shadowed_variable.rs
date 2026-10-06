@@ -23,7 +23,7 @@ impl Rule for ShadowedVariable {
         let model = SemanticModel::analyze(node, ctx.source);
         let mut diagnostics = Vec::new();
 
-        for (scope_idx, scope) in model.scopes.iter().enumerate() {
+        for scope in &model.scopes {
             if !matches!(scope.kind, ScopeKind::Module | ScopeKind::Function) {
                 continue;
             }
@@ -33,32 +33,26 @@ impl Rule for ShadowedVariable {
                     continue;
                 }
 
-                // Procura o mesmo nome em algum ancestral.
                 let mut current = scope.parent;
                 while let Some(pid) = current {
                     let parent = &model.scopes[pid];
-                    if matches!(parent.kind, ScopeKind::Module | ScopeKind::Function) {
-                        if parent.bindings.contains_key(&binding.name) {
-                            diagnostics.push(Diagnostic::new(
-                                "FOR008",
-                                &format!(
-                                    "`{}` faz shadowing de uma variável do escopo externo.",
-                                    binding.name
-                                ),
-                                binding.range.clone(),
-                                Severity::Warning,
-                            ));
-                            break;
-                        }
+                    if matches!(parent.kind, ScopeKind::Module | ScopeKind::Function)
+                        && parent.bindings.contains_key(&binding.name)
+                    {
+                        diagnostics.push(Diagnostic::new(
+                            "FOR008",
+                            &format!(
+                                "`{}` faz shadowing de uma variável do escopo externo.",
+                                binding.name
+                            ),
+                            binding.range.clone(),
+                            Severity::Warning,
+                        ));
+                        break;
                     }
                     current = parent.parent;
                 }
             }
-
-            // Silencia warnings do compilador por `scope_idx` não usado; mas
-            // ele é útil se quisermos, no futuro, pular o módulo. Mantemos
-            // abaixo via `_`.
-            let _ = scope_idx;
         }
 
         diagnostics
@@ -72,8 +66,6 @@ fn is_ignored(binding: &forge_semantic::Binding) -> bool {
     if binding.name == "self" || binding.name == "cls" {
         return true;
     }
-    // Não reportamos shadowing causado por funções/classes — elas costumam
-    // ser redefinidas intencionalmente (overrides, factories, etc.).
     matches!(binding.kind, BindingKind::Function | BindingKind::Class)
 }
 

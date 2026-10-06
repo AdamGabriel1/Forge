@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use forge_core::{
-    apply_edits, baseline::Baseline, baseline::build_from, noqa, Config, Context, Diagnostic,
+    apply_edits, baseline::build_from, baseline::Baseline, noqa, Config, Context, Diagnostic,
     Severity,
 };
 use forge_lint::{default_registry, RuleRegistry};
@@ -164,22 +164,13 @@ fn load_baseline(path: &Option<PathBuf>) -> Option<Baseline> {
     match Baseline::load(path) {
         Ok(b) => Some(b),
         Err(e) => {
-            eprintln!(
-                "Erro ao carregar baseline {}: {}",
-                path.display(),
-                e
-            );
+            eprintln!("Erro ao carregar baseline {}: {}", path.display(), e);
             process::exit(2);
         }
     }
 }
 
-fn run_check(
-    path: PathBuf,
-    strict: bool,
-    format: OutputFormat,
-    baseline_path: Option<PathBuf>,
-) {
+fn run_check(path: PathBuf, strict: bool, format: OutputFormat, baseline_path: Option<PathBuf>) {
     let config = load_config(&path);
     let registry = default_registry();
     let mut parser = get_parser();
@@ -188,7 +179,7 @@ fn run_check(
     let mut collected: Vec<(String, Diagnostic)> = Vec::new();
 
     for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
-        if !entry.path().extension().map_or(false, |ext| ext == "py") {
+        if !entry.path().extension().is_some_and(|ext| ext == "py") {
             continue;
         }
         let filepath = entry.path();
@@ -266,7 +257,7 @@ fn run_baseline(path: PathBuf, output: PathBuf) {
     let mut entries = Vec::new();
 
     for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
-        if !entry.path().extension().map_or(false, |ext| ext == "py") {
+        if !entry.path().extension().is_some_and(|ext| ext == "py") {
             continue;
         }
         let filepath = entry.path();
@@ -307,7 +298,7 @@ fn run_fix(path: PathBuf, dry_run: bool, check: bool) {
     let mut files_changed = 0usize;
 
     for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
-        if !entry.path().extension().map_or(false, |ext| ext == "py") {
+        if !entry.path().extension().is_some_and(|ext| ext == "py") {
             continue;
         }
         let filepath = entry.path();
@@ -349,10 +340,7 @@ fn run_fix(path: PathBuf, dry_run: bool, check: bool) {
         files_changed += 1;
 
         if check {
-            println!(
-                "{}: {} correção(ões) disponível(is)",
-                ctx.filepath, n_edits
-            );
+            println!("{}: {} correção(ões) disponível(is)", ctx.filepath, n_edits);
             continue;
         }
 

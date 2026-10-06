@@ -39,10 +39,7 @@ fn check_body_for_redefinitions(body: Node, source: &str, out: &mut Vec<Diagnost
 
     let mut cursor = body.walk();
     for child in body.children(&mut cursor) {
-        if !matches!(
-            child.kind(),
-            "function_definition" | "class_definition"
-        ) {
+        if !matches!(child.kind(), "function_definition" | "class_definition") {
             continue;
         }
         let Some(name_node) = child.child_by_field_name("name") else {

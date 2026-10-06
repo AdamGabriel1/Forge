@@ -6,10 +6,7 @@ use std::collections::HashSet;
 /// - `# noqa` → suprime tudo na linha.
 /// - `# noqa: FOR001` → suprime apenas a regra na linha.
 /// - `# noqa: FOR001, FOR002` → suprime várias.
-pub fn filter_suppressed(
-    diagnostics: Vec<Diagnostic>,
-    source: &str,
-) -> Vec<Diagnostic> {
+pub fn filter_suppressed(diagnostics: Vec<Diagnostic>, source: &str) -> Vec<Diagnostic> {
     let entries = parse_noqa(source);
     diagnostics
         .into_iter()

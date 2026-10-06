@@ -1,6 +1,7 @@
 use crate::util::{range_of, walk};
+use crate::Context;
 use crate::Rule;
-use forge_core::{Context, Diagnostic, Edit, Severity};
+use forge_core::{Diagnostic, Edit, Severity};
 use std::collections::HashSet;
 use tree_sitter::Node;
 
@@ -317,7 +318,7 @@ def f():
         let mut parser = forge_parser::get_parser();
         let tree = forge_parser::parse_python_source(&mut parser, source).unwrap();
         let cfg = forge_core::Config::default();
-        let ctx = make_ctx(source, &cfg);
+        let ctx = crate::Context::new(source, "<test>", &cfg, tree.root_node());
         let diags = UnusedImport.check(tree.root_node(), &ctx);
         UnusedImport.fix(tree.root_node(), &ctx, &diags)
     }

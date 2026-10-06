@@ -1,7 +1,8 @@
 use crate::util::{is_alone_on_line, line_end_with_newline, line_start_byte, walk};
+use crate::Context;
 use crate::Rule;
 use forge_cfg::find_unreachable_in_block;
-use forge_core::{Context, Diagnostic, Edit, Severity};
+use forge_core::{Diagnostic, Edit, Severity};
 use tree_sitter::Node;
 
 pub struct UnreachableCode;
@@ -168,12 +169,8 @@ def outer():
     fn run_fix(source: &str) -> Vec<Edit> {
         let mut parser = forge_parser::get_parser();
         let tree = forge_parser::parse_python_source(&mut parser, source).unwrap();
-        let cfg = Config::default();
-        let ctx = Context {
-            source,
-            filepath: "<test>",
-            config: &cfg,
-        };
+        let cfg = forge_core::Config::default();
+        let ctx = crate::Context::new(source, "<test>", &cfg, tree.root_node());
         let diags = UnreachableCode.check(tree.root_node(), &ctx);
         UnreachableCode.fix(tree.root_node(), &ctx, &diags)
     }

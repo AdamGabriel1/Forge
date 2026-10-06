@@ -80,18 +80,14 @@ pub(crate) fn is_alone_on_line(node: Node, source: &str) -> bool {
 
 #[cfg(test)]
 pub(crate) mod test_util {
-    use crate::Rule;
-    use forge_core::{Config, Context, Diagnostic};
+    use crate::{Context, Rule};
+    use forge_core::{Config, Diagnostic};
     use forge_parser::{get_parser, parse_python_source};
 
     pub fn lint_with(rule: &dyn Rule, source: &str, config: &Config) -> Vec<Diagnostic> {
         let mut parser = get_parser();
         let tree = parse_python_source(&mut parser, source).expect("parse falhou");
-        let ctx = Context {
-            source,
-            filepath: "<test>",
-            config,
-        };
+        let ctx = Context::new(source, "<test>", config, tree.root_node());
         rule.check(tree.root_node(), &ctx)
     }
 

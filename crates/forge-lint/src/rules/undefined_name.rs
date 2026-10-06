@@ -1,5 +1,6 @@
+use crate::Context;
 use crate::Rule;
-use forge_core::{Context, Diagnostic, Severity};
+use forge_core::{Diagnostic, Severity};
 use forge_semantic::SemanticModel;
 use tree_sitter::Node;
 
@@ -20,7 +21,7 @@ impl Rule for UndefinedName {
     }
 
     fn check(&self, node: Node, ctx: &Context) -> Vec<Diagnostic> {
-        let model = SemanticModel::analyze(node, ctx.source);
+        let model = ctx.semantic();
         let mut diagnostics = Vec::new();
 
         for (name, range) in model.unresolved_uses() {

@@ -1,9 +1,8 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use forge_core::{
-    apply_edits, baseline::build_from, baseline::Baseline, noqa, Config, Context, Diagnostic,
-    Severity,
+    apply_edits, baseline::build_from, baseline::Baseline, noqa, Config, Diagnostic, Severity,
 };
-use forge_lint::{default_registry, RuleRegistry};
+use forge_lint::{default_registry, Context, RuleRegistry};
 use forge_parser::{get_parser, parse_python_source};
 use rayon::prelude::*;
 use serde::Serialize;
@@ -126,8 +125,7 @@ fn load_config(path: &Path) -> Config {
     }
 }
 
-/// Coleta todos os arquivos `.py` sob `path` em ordem determinística
-/// (a que o `WalkDir` retorna, que por sua vez é estável).
+/// Coleta todos os arquivos `.py` sob `path` em ordem determinística.
 fn collect_python_files(path: &Path) -> Vec<PathBuf> {
     WalkDir::new(path)
         .into_iter()
@@ -149,11 +147,7 @@ fn collect_diagnostics(
     let Some(tree) = parse_python_source(parser, source) else {
         return Vec::new();
     };
-    let ctx = Context {
-        source,
-        filepath,
-        config,
-    };
+    let ctx = Context::new(source, filepath, config, tree.root_node());
     let mut diags: Vec<Diagnostic> = Vec::new();
     for rule in registry.all() {
         if !config.lint.is_enabled(rule.code()) {
@@ -339,11 +333,7 @@ fn run_fix(path: PathBuf, dry_run: bool, check: bool) {
                 };
                 let tree = parse_python_source(parser, &source)?;
                 let filepath_str = filepath.to_string_lossy().into_owned();
-                let ctx = Context {
-                    source: &source,
-                    filepath: &filepath_str,
-                    config: &config,
-                };
+                let ctx = Context::new(&source, &filepath_str, &config, tree.root_node());
                 let mut edits = Vec::new();
                 for rule in registry.all() {
                     if !config.lint.is_enabled(rule.code()) {

@@ -1,6 +1,7 @@
 use crate::util::range_of;
+use crate::Context;
 use crate::Rule;
-use forge_core::{Context, Diagnostic, Severity};
+use forge_core::{Diagnostic, Severity};
 use tree_sitter::Node;
 
 const DEFAULT_MAX_ARGS: usize = 5;

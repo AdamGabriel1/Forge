@@ -1,6 +1,7 @@
+use crate::Context;
 use crate::Rule;
-use forge_core::{Context, Diagnostic, Severity};
-use forge_semantic::{BindingKind, ScopeKind, SemanticModel};
+use forge_core::{Diagnostic, Severity};
+use forge_semantic::{BindingKind, ScopeKind};
 use tree_sitter::Node;
 
 pub struct ShadowedVariable;
@@ -20,7 +21,7 @@ impl Rule for ShadowedVariable {
     }
 
     fn check(&self, node: Node, ctx: &Context) -> Vec<Diagnostic> {
-        let model = SemanticModel::analyze(node, ctx.source);
+        let model = ctx.semantic();
         let mut diagnostics = Vec::new();
 
         for scope in &model.scopes {

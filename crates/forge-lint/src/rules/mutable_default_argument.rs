@@ -1,6 +1,7 @@
 use crate::util::{range_of, walk};
+use crate::Context;
 use crate::Rule;
-use forge_core::{Context, Diagnostic, Edit, Severity};
+use forge_core::{Diagnostic, Edit, Severity};
 use tree_sitter::Node;
 
 pub struct MutableDefaultArgument;

@@ -1,8 +1,9 @@
 use crate::util::walk;
+use crate::Context;
 use crate::Rule;
 use forge_cfg::dataflow::{run_block, Analysis};
 use forge_cfg::definite_assignment::{collect_locals, DefiniteAssignmentAnalysis};
-use forge_core::{Context, Diagnostic};
+use forge_core::Diagnostic;
 use tree_sitter::Node;
 
 pub struct UsedBeforeAssignment;

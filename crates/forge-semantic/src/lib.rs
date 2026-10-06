@@ -147,9 +147,13 @@ fn range_of(node: Node) -> Range {
 
 fn first_child_of_kind<'a>(parent: Node<'a>, kind: &str) -> Option<Node<'a>> {
     let mut cursor = parent.walk();
-    parent
+    // Guardar em variável local força o drop do iterador temporário
+    // antes de `cursor` sair de escopo. Sem isso, o compilador recusa
+    // com E0597 porque o temporário "vive" até o fim do bloco.
+    let found = parent
         .children(&mut cursor)
-        .find(|&child| child.kind() == kind)
+        .find(|&child| child.kind() == kind);
+    found
 }
 
 fn first_segment(node: Node, source: &str) -> String {

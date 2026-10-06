@@ -1,6 +1,6 @@
 use crate::util::walk;
 use crate::Rule;
-use forge_cfg::dataflow::run_block;
+use forge_cfg::dataflow::{run_block, Analysis};
 use forge_cfg::definite_assignment::{collect_locals, DefiniteAssignmentAnalysis};
 use forge_core::{Context, Diagnostic};
 use tree_sitter::Node;
